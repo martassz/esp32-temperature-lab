@@ -34,7 +34,7 @@ Currently integrated sensors and components:
 
 ### Microcontroller
 
-- ESP32 DevKit v1 (USB communication, C++ firmware, no sleep mode)
+- ESP32 DevKit v1 (USB communication, C++ firmware)
 
 ### PC Software
 
