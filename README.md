@@ -1,89 +1,106 @@
-# Temperature Measurement and Data Logging Platform
+# Laboratory Exercise Platform for Ambient Temperature Measurement
 
-ESP32 + Python desktop application for teaching temperature measurement methods, sensor comparison and basic data analysis.
+This project is a comprehensive solution for a Bachelor's thesis and laboratory exercise focused on measuring ambient temperature using various methods. It consists of a hardware station based on the ESP32 microcontroller and a desktop application for data visualization and analysis.
 
-This project implements a modular system for measuring, logging and analyzing temperature using multiple types of sensors. The system is intended for a laboratory exercise where students compare different temperature-measurement methods, sensor accuracy, sensitivity and dynamic behavior.
-
-The platform consists of:
-
-- ESP32 DevKit v1 firmware written in C++
-- Python desktop application for real-time visualization and datalogging
-- Multiple temperature sensors of different categories
-- PWM-controlled heating and cooling elements
-
-## Hardware Overview
-
-Currently integrated sensors and components:
-
-### Temperature sensors
-
-- NTC thermistor, 10 kΩ
-- Metal-film resistor, 10 kΩ (for temperature coefficient comparison)
-- TMP117 (high-accuracy reference thermometer)
-- DS18B20 (standard version)
-- DS18B20 (waterproof version)
-- BME280 (temperature and humidity)
-- ADS1115 (16-bit ADC for NTC and resistor measurements)
-
-### Actuators
-
-- PWM fan
-- Peltier module (TEC1-12706)
-- Resistive heater
-- MOSFET PWM driver module (LR7843)
-
-### Microcontroller
-
-- ESP32 DevKit v1 (USB communication, C++ firmware)
-
-### PC Software
-
-- Python desktop application
-- USB serial communication
-- Real-time plotting
-- CSV logging
-
-## Software Overview
-
-### ESP32 Firmware (C++)
-
-- Modular sensor drivers (I2C, ADC, OneWire)
-- ADS1115 voltage sampling for NTC and metal-film resistor
-- JSON messages sent over USB (CDC)
-- PWM control for cooling/heating elements
-
-### Python Application
-
-- Serial port communication
-- JSON parsing
-- Real-time plotting of selected sensors
-- CSV datalogging
-- Basic post-processing and comparison of sensor data
+The platform allows students to compare accuracy, resolution, and time response of different sensor types (Digital, Analog, Passive components) under controlled conditions.
 
 ## Project Goals
 
-### Completed
+This repository implements the practical part of the laboratory exercise design:
+1.  **Sensor Comparison:** Verification of accuracy and dynamic response of sensors (BME280, TMP117, DS18B20, Thermistors).
+2.  **Data Acquisition:** Using ESP32 for reliable data logging via JSON over Serial.
+3.  **Temperature Control:** Platform for controlled ambient temperature change (Heating/Cooling).
+4.  **Visualization:** Desktop GUI for real-time plotting and data export.
 
-- Basic ESP32 firmware
-- USB JSON communication between ESP32 and PC
-- ADS1115 integration for analog measurements
-- TMP117, BME280 and DS18B20 sensor support
-- Python application with real-time plotting
+## Repository Structure
 
-### Work in Progress
+* `App/` - Python desktop application (GUI) for control and visualization.
+* `ESP32-lab/` - C++ Firmware for the ESP32 microcontroller (PlatformIO project).
 
-- Refinement of plotting (axis alignment, scaling, UI tweaks)
-- Improving robustness of USB communication and reconnection
-- Refactoring firmware into clearer modules
-- CSV datalogging
+---
 
-### Planned
+## Hardware Specification
 
-- Dew-point calculation tools in the Python application
-- Simple calibration workflow for selected sensors
-- Export of graphs directly from the application
-- Detailed documentation for each laboratory task
+**Microcontroller:** ESP32 DevKit v1
 
-## Citations
+### Supported Sensors
+The firmware supports the following sensors connected simultaneously:
+* **BME280** (I2C): Combined temperature, humidity, and pressure sensor.
+* **TMP117** (I2C): High-precision reference temperature sensor.
+* **DS18B20** (OneWire): Digital temperature sensor (supports multiple sensors on one bus).
+* **ADS1115** (I2C): External 16-bit ADC for precise analog measurements (NTC/Resistor).
+* **Internal ADC**: Used for basic voltage measurements on ESP32 pins.
 
-All external libraries, datasheets and referenced materials will be cited according to ČSN ISO 690 in the written thesis. A separate bibliography file will be added later.
+### Actuators (Temperature Control)
+* **Heater:** Resistive load controlled via PWM.
+* **Cooler:** Peltier module or Fan controlled via PWM.
+
+### Pinout Configuration
+
+| Component         | Interface      | ESP32 Pin | Notes |
+|-------------------|----------------|-----------|-------|
+| **BME280** | I2C SDA        | GPIO 21   | |
+| **TMP117** | I2C SCL        | GPIO 22   | |
+| **ADS1115** | I2C            | 21 / 22   | Address 0x49 (configurable) |
+| **DS18B20** | OneWire        | GPIO 4    | Requires 4k7 pull-up resistor |
+| **Heater (MOSFET)**| PWM Channel 0 | GPIO 18   | |
+| **Cooler (MOSFET)**| PWM Channel 1 | GPIO 19   | |
+| **Internal ADC** | Analog Input   | GPIO 34   | Resistor divider measurement |
+| **Internal ADC** | Analog Input   | GPIO 35   | NTC Thermistor divider measurement |
+
+---
+
+## Software Application
+
+The desktop application provides a user-friendly interface for the laboratory exercise.
+
+### Features
+* **Connection Manager:** Auto-detection of COM ports and handshake with ESP32.
+* **Real-time Plotting:** High-performance graphing using `pyqtgraph`.
+* **Sensor Selection:** Ability to toggle specific sensors for visualization.
+* **Actuator Control:** Manual PWM slider for Heater and Cooler control.
+* **Data Export:** Export measured data to CSV format for further processing (Excel/MATLAB).
+* **Measurement Modes:** Supports different measurement scenarios (e.g., "Part 1: Resistive Sensors", "Slow Measurement").
+
+### Dependencies
+The application is built with Python 3.11+ and requires the following libraries:
+* `PySide6` (Qt for Python)
+* `pyqtgraph`
+* `pyserial`
+
+---
+
+## Installation and Usage
+
+### 1. Firmware (ESP32)
+1.  Install **VS Code** with the **PlatformIO** extension.
+2.  Open the `ESP32-lab` folder.
+3.  Connect the ESP32 via USB.
+4.  Build and Upload the firmware (PlatformIO automatically handles libraries: Adafruit BME280, DallasTemperature, etc.).
+
+### 2. Desktop App (PC)
+1.  Ensure Python 3.11 is installed.
+2.  Navigate to the `App` directory.
+3.  Install dependencies:
+    ```bash
+    pip install PySide6 pyqtgraph pyserial
+    ```
+4.  Run the application:
+    ```bash
+    python main.py
+    ```
+
+## Communication Protocol
+
+The PC and ESP32 communicate via USB Serial (115200 baud) using a JSON-based protocol.
+
+**Data Packet Example (ESP -> PC):**
+```json
+{
+  "type": "data",
+  "t_ms": 12500,
+  "T_BME": 24.50,
+  "T_TMP": 24.55,
+  "V_ADS_NTC": 1150.2,
+  "T_DS0": 24.25
+}
