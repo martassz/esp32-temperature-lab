@@ -5,6 +5,7 @@ class PartOneMeasurement(StreamingTempMeasurement):
     DISPLAY_NAME = "Část 1: Odporové snímače"
     DURATION_S = 3600.0 
     SAMPLE_RATE_HZ = 1.0
+    SHOW_REFERENCE_CURVE = True
 
     def __init__(self, serial_mgr, pwm_channel=0, pwm_value=0):
         # Předáme kwargs dál (i když zde je explicitně pwm_channel)

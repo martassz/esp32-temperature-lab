@@ -81,3 +81,11 @@ class MeasurementManager(QObject):
 
     def _on_data_callback(self, t_s: float, values: dict):
         self.data_received.emit(t_s, values)
+
+    def should_show_reference(self, type_name: str) -> bool:
+        """Vrátí True, pokud má daný typ měření definovaný požadavek na referenční křivku."""
+        measure_cls = self._types.get(type_name)
+        if measure_cls:
+            # Získáme atribut třídy, defaultně False
+            return getattr(measure_cls, "SHOW_REFERENCE_CURVE", False)
+        return False

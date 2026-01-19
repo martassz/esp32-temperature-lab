@@ -63,6 +63,10 @@ class RealtimePlotWidget(QWidget):
 
         layout.addWidget(self._plot_widget)
 
+    def set_reference_mode(self, enabled: bool):
+        """Zapne/vypne speciální styl pro referenční senzor (TMP117)."""
+        self._reference_mode_enabled = enabled
+
     def set_dual_axis_mode(self, enabled: bool):
         self._dual_axis_enabled = enabled
         self._plot_item.showAxis('right', enabled)
@@ -149,10 +153,17 @@ class RealtimePlotWidget(QWidget):
         self._time_window = seconds
 
     def _create_curve(self, key: str):
-        # Použití centrální funkce
         pretty_name = get_sensor_name(key)
         
-        color = self._assign_color(len(self._curves))
+        # --- ZJEDNODUŠENÁ LOGIKA ---
+        # Zda je tento konkrétní senzor referencí, závisí jen na jeho ID 
+        # a na tom, zda je zapnutý globální referenční režim pro tento graf.
+        is_reference = ("TMP117" in key or "TMP117" in pretty_name) and self._reference_mode_enabled
+        
+        if is_reference:
+            color = pg.mkColor("#FFFFFF")
+        else:
+            color = self._assign_color(len(self._curves))
         
         self._data_x[key] = []
         self._data_y[key] = []
@@ -161,31 +172,33 @@ class RealtimePlotWidget(QWidget):
             key.startswith("V_") or key.startswith("ADC") or key.startswith("ESP")
         )
         
-        if self._dual_axis_enabled:
-            if use_right_axis:
-                pen = pg.mkPen(color=color, width=2, style=Qt.SolidLine)
-                symbol = 'x'
-                sym_size = 7
-            else:
-                pen = pg.mkPen(color=color, width=2, style=Qt.DashLine)
-                symbol = 'x'
-                sym_size = 7
+        # --- STYL ---
+        if is_reference:
+            # Referenční styl: Bílá, čárkovaná, bez symbolu
+            style = Qt.DashLine
+            width = 2
+            symbol = None
+            sym_size = 0
         else:
-            pen = pg.mkPen(color=color, width=2, style=Qt.SolidLine)
+            # Běžný styl
+            style = Qt.SolidLine
+            width = 2
             symbol = 'x'
             sym_size = 7
+            
+            # (Volitelné) Pokud chcete zachovat čárkování ostatních teplot v dual-axis režimu:
+            if self._dual_axis_enabled and not use_right_axis:
+                style = Qt.DashLine
+
+        pen = pg.mkPen(color=color, width=width, style=style)
 
         if use_right_axis:
-            # Křivka pro druhou osu (manuální přidání do legendy)
             curve = pg.PlotDataItem(
                 name=pretty_name, pen=pen, symbol=symbol, symbolSize=sym_size, symbolBrush=color, antialias=True
             )
             self._view_voltage.addItem(curve)
-            
-            if self._legend:
-                self._legend.addItem(curve, pretty_name)
+            if self._legend: self._legend.addItem(curve, pretty_name)
         else:
-            # Křivka pro hlavní osu (automatická legenda)
             curve = self._plot_widget.plot(
                 name=pretty_name, pen=pen, symbol=symbol, symbolSize=sym_size, symbolBrush=color, antialias=True
             )

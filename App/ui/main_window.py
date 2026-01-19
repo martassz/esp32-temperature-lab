@@ -88,6 +88,9 @@ class MainWindow(QMainWindow):
         self.plot_widget.clear()
         self.cards_panel.clear()
 
+        show_ref = self.meas_mgr.should_show_reference(type_name)
+        self.plot_widget.set_reference_mode(show_ref)
+
         if type_name == PartOneMeasurement.DISPLAY_NAME:
             self.sidebar.show_pwm_controls()
             self.plot_widget.set_dual_axis_mode(True)
