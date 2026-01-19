@@ -17,6 +17,7 @@ class StreamingTempMeasurement(BaseMeasurement):
     DURATION_S = 10.0
     SAMPLE_RATE_HZ = 2.0  # Defaultní frekvence (lze přepsat v potomcích)
     NO_DATA_TIMEOUT_S = 5.0
+    SHOW_REFERENCE_CURVE = False
 
     def __init__(self, serial_mgr, **kwargs):
         super().__init__(serial_mgr)
