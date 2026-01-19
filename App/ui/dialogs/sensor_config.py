@@ -65,7 +65,7 @@ class SensorConfigDialog(QDialog):
         self.checks_layout = QVBoxLayout(container)
         self.checks_layout.setSpacing(5)
         
-        sensor_list = self.available_sensors if self.available_sensors else ["T_BME", "T_DS0"]
+        sensor_list = self.available_sensors if self.available_sensors else []
 
         for key in sensor_list:
             # Použití centrální funkce pro hezký název

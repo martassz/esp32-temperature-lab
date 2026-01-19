@@ -35,8 +35,9 @@ class Sidebar(QFrame):
         layout.setContentsMargins(15, 20, 15, 20)
         layout.setSpacing(15)
 
-        # --- SPOLEČNÝ STYL PRO COMBOBOXY ---
+# --- SPOLEČNÝ STYL PRO COMBOBOXY ---
         COMBO_BOX_STYLE = """
+            /* 1. Původní styl, který se vám líbí (tlačítko a šipka) */
             QComboBox {
                 background-color: #333337;
                 border: 1px solid #505050;
@@ -61,6 +62,16 @@ class Sidebar(QFrame):
                 margin-right: 2px;
                 width: 0; 
                 height: 0;
+            }
+
+            /* 2. PŘIDÁNO: Styl pro vysouvací seznam (aby nesplýval) */
+            QComboBox QAbstractItemView {
+                background-color: #181818;           /* Hodně tmavé pozadí */
+                border: 2px solid #007acc;           /* Výrazný modrý rámeček */
+                selection-background-color: #007acc; /* Modré podbarvení při najetí myší */
+                selection-color: white;
+                outline: 0;
+                color: #e0e0e0;
             }
         """
 
@@ -251,7 +262,7 @@ class Sidebar(QFrame):
             self.btn_connect.setEnabled(True)
         else:
             self.btn_connect.setText("Připojit k ESP")
-            self.btn_connect.setStyleSheet("")
+            self.btn_connect.setStyleSheet("background-color: #007acc; color: white;")
             self.combo_ports.setEnabled(True)
             self.btn_start.setEnabled(False)
             self.btn_stop.setEnabled(False)

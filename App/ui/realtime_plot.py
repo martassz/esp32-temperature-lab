@@ -80,22 +80,26 @@ class RealtimePlotWidget(QWidget):
         self._data_x.clear()
         self._data_y.clear()
 
-        # Reset legendy
-        if self._legend:
+        # --- FIX LEGENDY ---
+        # PyQtGraph PlotItem si drží referenci na legendu v .legend
+        # Pokud ji odstraníme ze scény, musíme ji nastavit na None,
+        # jinak addLegend() vrátí tu starou (již odstraněnou ze scény) a neviditelnou.
+        if self._plot_item.legend:
             try:
-                if self._legend.scene():
-                    self._legend.scene().removeItem(self._legend)
+                if self._plot_item.legend.scene():
+                    self._plot_item.legend.scene().removeItem(self._plot_item.legend)
             except Exception:
                 pass
+            self._plot_item.legend = None  # <--- KLÍČOVÝ ŘÁDEK PRO OPRAVU
             
-            self._legend = self._plot_item.addLegend(offset=(10, 10))
-            self._legend.setBrush(pg.mkBrush(0, 0, 0, 150))
-            self._legend.setLabelTextColor("#FFFFFF")
+        self._legend = self._plot_item.addLegend(offset=(10, 10))
+        self._legend.setBrush(pg.mkBrush(0, 0, 0, 150))
+        self._legend.setLabelTextColor("#FFFFFF")
 
         self._plot_widget.setXRange(0, self._time_window, padding=0.02)
 
     def add_point(self, t_s: float, values: Dict[str, float]):
-        current_max_time = 0.0
+        current_max_time = t_s
 
         for sensor_key, val in values.items():
             # Pokud křivka pro daný senzor neexistuje, vytvoříme ji
@@ -160,8 +164,8 @@ class RealtimePlotWidget(QWidget):
         if self._dual_axis_enabled:
             if use_right_axis:
                 pen = pg.mkPen(color=color, width=2, style=Qt.SolidLine)
-                symbol = 'o'
-                sym_size = 5
+                symbol = 'x'
+                sym_size = 7
             else:
                 pen = pg.mkPen(color=color, width=2, style=Qt.DashLine)
                 symbol = 'x'
