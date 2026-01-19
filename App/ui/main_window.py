@@ -148,7 +148,8 @@ class MainWindow(QMainWindow):
             filtered = values
         if filtered:
             self.cards_panel.update_values(filtered)
-            self.plot_widget.add_point(t_s, filtered)
+            
+        self.plot_widget.add_point(t_s, filtered)
 
     @Slot(float)
     def _on_measurement_progress(self, fraction: float):
@@ -211,6 +212,10 @@ class MainWindow(QMainWindow):
     def _handle_disconnect_request(self):
         self.meas_mgr.stop_measurement()
         self.serial_mgr.close()
+
+        self.detected_sensors = []
+        self.allowed_sensors = set()
+
         self.sidebar.set_connected_state(False)
         self.sidebar.set_measurement_running(False)
         self.cards_panel.clear()

@@ -73,7 +73,7 @@ class StreamingTempMeasurement(BaseMeasurement):
         if msg.get("type") == "ack": return
 
         data = extract_data_values(msg)
-        if not data: return
+        #if not data: return
 
         self._last_data_time = time.time()
 
