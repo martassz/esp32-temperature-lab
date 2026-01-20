@@ -1,7 +1,8 @@
 from typing import List
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QLabel, QComboBox, QPushButton, 
-    QProgressBar, QWidget, QSlider, QRadioButton, QButtonGroup, QHBoxLayout
+    QProgressBar, QWidget, QSlider, QRadioButton, QButtonGroup, QHBoxLayout,
+    QCheckBox
 )
 from PySide6.QtCore import Signal, Qt
 
@@ -17,16 +18,21 @@ class Sidebar(QFrame):
     measurement_type_changed = Signal(str) 
     pwm_changed = Signal(int, int) # (channel, value 0-100)
     export_clicked = Signal()
+    filter_toggled = Signal(bool)
 
     def __init__(self, measurement_types: List[str], parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
         self.setFixedWidth(280) 
         
+        # --- NOVÉ: Sledování stavu připojení ---
+        self._is_connected = False
+        # ---------------------------------------
+
         # Inicializace referencí na dynamické prvky pro bezpečnost
         self.rb_heater = None
         self.rb_cooler = None
-        self.slider_pwm = None # Přidána reference na slider
+        self.slider_pwm = None 
         
         self._init_ui(measurement_types)
 
@@ -37,7 +43,6 @@ class Sidebar(QFrame):
 
 # --- SPOLEČNÝ STYL PRO COMBOBOXY ---
         COMBO_BOX_STYLE = """
-            /* 1. Původní styl, který se vám líbí (tlačítko a šipka) */
             QComboBox {
                 background-color: #333337;
                 border: 1px solid #505050;
@@ -63,12 +68,10 @@ class Sidebar(QFrame):
                 width: 0; 
                 height: 0;
             }
-
-            /* 2. PŘIDÁNO: Styl pro vysouvací seznam (aby nesplýval) */
             QComboBox QAbstractItemView {
-                background-color: #181818;           /* Hodně tmavé pozadí */
-                border: 2px solid #007acc;           /* Výrazný modrý rámeček */
-                selection-background-color: #007acc; /* Modré podbarvení při najetí myší */
+                background-color: #181818;
+                border: 2px solid #007acc;
+                selection-background-color: #007acc;
                 selection-color: white;
                 outline: 0;
                 color: #e0e0e0;
@@ -96,6 +99,8 @@ class Sidebar(QFrame):
         self.combo_type = QComboBox()
         self.combo_type.addItems(measurement_types)
         self.combo_type.setStyleSheet(COMBO_BOX_STYLE)
+        # Fix: Zablokování kolečka myši, aby se neměnil typ měření omylem
+        self.combo_type.wheelEvent = lambda event: event.ignore()
         self.combo_type.currentTextChanged.connect(self.measurement_type_changed.emit)
         layout.addWidget(self.combo_type)
 
@@ -125,6 +130,12 @@ class Sidebar(QFrame):
         
         layout.addSpacing(5)
 
+        self.filter_cb = QCheckBox("Korekce šumu (Oversampling)")
+        self.filter_cb.setStyleSheet("QCheckBox { color: #e0e0e0; margin-bottom: 5px; margin-left: 2px; }")
+        self.filter_cb.toggled.connect(self.filter_toggled.emit)
+        self.filter_cb.hide() 
+        layout.addWidget(self.filter_cb)
+
         # --- START / STOP / EXPORT ---
         self.btn_start = QPushButton("START")
         self.btn_start.setObjectName("BtnStart")
@@ -143,7 +154,24 @@ class Sidebar(QFrame):
         layout.addWidget(self.btn_stop)
 
         self.btn_export = QPushButton("Exportovat CSV")
-        self.btn_export.setStyleSheet("background-color: #d19a66; color: #202020; font-weight: bold;")
+        self.btn_export.setFixedHeight(40)
+        self.btn_export.setStyleSheet("""
+            QPushButton {
+                background-color: #d19a66; 
+                color: #202020; 
+                font-weight: bold;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QPushButton:hover {
+                background-color: #e5b585; /* Světlejší oranžová při najetí myší */
+            }
+            QPushButton:disabled {
+                background-color: #3e3e42; /* Tmavě šedá, když je tlačítko vypnuté */
+                color: #808080;            /* Tmavší text */
+                border: 1px solid #505050;
+            }
+        """)
         self.btn_export.setCursor(Qt.PointingHandCursor)
         self.btn_export.clicked.connect(self.export_clicked.emit)
         self.btn_export.hide()
@@ -152,7 +180,8 @@ class Sidebar(QFrame):
         layout.addStretch()
 
         # --- STATUS ---
-        self.lbl_status = QLabel("Připraveno")
+        # ZMĚNA: Výchozí stav je "Odpojeno"
+        self.lbl_status = QLabel("Odpojeno")
         self.lbl_status.setStyleSheet("color: #808080; font-size: 11px;")
         self.lbl_status.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.lbl_status)
@@ -177,7 +206,7 @@ class Sidebar(QFrame):
         # Vyčistíme reference
         self.rb_heater = None
         self.rb_cooler = None
-        self.slider_pwm = None # Reset reference na slider
+        self.slider_pwm = None 
         
         self.btn_export.hide()
 
@@ -221,10 +250,14 @@ class Sidebar(QFrame):
         
         self.dynamic_layout.addWidget(self.slider_pwm)
         self.btn_export.show()
+        self.filter_cb.show()
 
     def show_simple_controls(self):
         self.clear_dynamic_section()
         self.btn_export.show()
+
+        self.filter_cb.hide()
+        self.filter_cb.setChecked(False)
 
     # --- Handlery ---
 
@@ -239,7 +272,16 @@ class Sidebar(QFrame):
 
     def _add_section_label(self, layout, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet("color: #007acc; font-weight: bold; letter-spacing: 1.2px; font-size: 11px;")
+        lbl.setStyleSheet("""
+            QLabel {
+                color: #007acc; 
+                font-weight: bold; 
+                font-size: 12px; 
+                letter-spacing: 0.5px;
+                margin-top: 10px;
+                margin-bottom: 2px;
+            }
+        """)
         layout.addWidget(lbl)
 
     # --- Původní metody ---
@@ -250,6 +292,9 @@ class Sidebar(QFrame):
         self.combo_ports.setCurrentText(current)
 
     def set_connected_state(self, connected: bool):
+        # --- ZMĚNA: Ukládáme si stav připojení ---
+        self._is_connected = connected
+
         if connected:
             self.btn_connect.setText("ODPOJIT")
             self.btn_connect.setStyleSheet("background-color: #da3633; color: white;")
@@ -257,29 +302,35 @@ class Sidebar(QFrame):
             try: self.btn_connect.clicked.disconnect()
             except: pass
             self.btn_connect.clicked.connect(self._on_disconnect_click)
-            self.btn_start.setEnabled(True)
-            self.lbl_status.setText("Připojeno k ESP32")
+            
+            self.btn_start.setEnabled(True) # Povolit START
+            self.lbl_status.setText("Připraveno")
             self.btn_connect.setEnabled(True)
         else:
             self.btn_connect.setText("Připojit k ESP")
             self.btn_connect.setStyleSheet("background-color: #007acc; color: white;")
             self.combo_ports.setEnabled(True)
-            self.btn_start.setEnabled(False)
+            
+            self.btn_start.setEnabled(False) # Zakázat START
             self.btn_stop.setEnabled(False)
+            
             try: self.btn_connect.clicked.disconnect()
             except: pass
             self.btn_connect.clicked.connect(self._on_connect_click)
+            
             self.lbl_status.setText("Odpojeno")
             self.btn_connect.setEnabled(True)
 
     def set_measurement_running(self, running: bool):
-        self.btn_start.setEnabled(not running)
+        # --- ZMĚNA: Tlačítko START povolíme jen když neběží měření A JSME PŘIPOJENI ---
+        self.btn_start.setEnabled(not running and self._is_connected)
+        
         self.btn_stop.setEnabled(running)
         self.combo_type.setEnabled(not running)
         self.btn_sensors.setEnabled(not running)
-        
-        # --- ZMĚNA: Zablokování PWM ovládání ---
-        # Bezpečné ovládání Radio Buttonů a Slideru
+        self.filter_cb.setEnabled(not running)
+        self.btn_export.setEnabled(not running)
+
         try:
             if self.rb_heater and not self.rb_heater.isHidden():
                 self.rb_heater.setEnabled(not running)
@@ -288,15 +339,19 @@ class Sidebar(QFrame):
             if self.slider_pwm and not self.slider_pwm.isHidden():
                 self.slider_pwm.setEnabled(not running)
         except RuntimeError:
-            # Widgety byly smazány C++ stranou, ale Python reference ještě žije
             pass
-        
+            
         if running:
             self.lbl_status.setText("Měření probíhá...")
             self.lbl_status.setStyleSheet("color: #2ea043; font-size: 11px;")
         else:
-            self.lbl_status.setText("Připraveno")
-            self.lbl_status.setStyleSheet("color: #808080; font-size: 11px;")
+            # --- ZMĚNA: Pokud jsme odpojení, nenapíšeme "Připraveno" ---
+            if self._is_connected:
+                self.lbl_status.setText("Připraveno")
+                self.lbl_status.setStyleSheet("color: #808080; font-size: 11px;")
+            else:
+                self.lbl_status.setText("Odpojeno")
+                self.lbl_status.setStyleSheet("color: #808080; font-size: 11px;")
 
     def set_waiting_state(self):
         self.btn_connect.setText("Čekám...")
@@ -316,3 +371,9 @@ class Sidebar(QFrame):
 
     def _on_stop_click(self):
         self.stop_measurement_clicked.emit()
+
+    def is_filter_checked(self) -> bool:
+        """Vrátí True, pokud je checkbox filtru zaškrtnutý."""
+        if hasattr(self, 'filter_cb') and self.filter_cb:
+            return self.filter_cb.isChecked()
+        return False

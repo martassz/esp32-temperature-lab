@@ -4,9 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-# Importujeme funkci pro hezké názvy (z nového souboru core/sensors.py)
-# Pokud soubor ještě nemáš, použijeme fallback na starou metodu z grafu,
-# ale doporučuji vytvořit core/sensors.py jak bylo v plánu.
+# Importujeme funkci pro hezké názvy
 try:
     from core.sensors import get_sensor_name
 except ImportError:
@@ -45,10 +43,9 @@ class ValueCardsPanel(QWidget):
         for key, val in values.items():
             unit = "°C"
             
-            # --- ZDE SE MĚNÍ JEDNOTKY ---
-            # Identifikace napěťových senzorů podle klíče
+            # Identifikace jednotek
             if key.startswith("V_") or key.startswith("ADC") or key.startswith("ESP"):
-                unit = "mV"  # Změna z "V" na "mV"
+                unit = "mV"
             elif key.startswith("PWM"):
                 unit = "%"
             
@@ -67,24 +64,42 @@ class ValueCardsPanel(QWidget):
         self._labels.clear()
 
     def _create_card(self, key: str, initial_text: str):
-        # Použijeme sjednocenou funkci pro název senzoru
         pretty_name = get_sensor_name(key)
 
         frame = QFrame()
         frame.setObjectName("ValueCard")
         frame.setFixedWidth(170)
         
+        # --- STYL KARTY ---
+        frame.setStyleSheet("""
+            QFrame#ValueCard {
+                background-color: #333337;
+                border: 1px solid #505050;
+                border-radius: 8px;
+            }
+            QLabel {
+                background-color: transparent;
+                border: none;
+            }
+        """)
+        
         l = QVBoxLayout(frame)
-        l.setContentsMargins(10, 8, 10, 8)
+        l.setContentsMargins(10, 10, 10, 10)
         l.setSpacing(2)
         
+        # --- NADPIS (NÁZEV SENZORU) ---
         lbl_title = QLabel(pretty_name)
         lbl_title.setObjectName("ValueTitle")
         lbl_title.setAlignment(Qt.AlignCenter)
         
+        # ZMĚNA: Použita barva #007acc (stejná jako v Sidebaru)
+        lbl_title.setStyleSheet("color: #007acc; font-size: 14px; font-weight: bold;")
+        
+        # --- HODNOTA ---
         lbl_val = QLabel(initial_text)
         lbl_val.setObjectName("ValueNumber")
         lbl_val.setAlignment(Qt.AlignCenter)
+        lbl_val.setStyleSheet("color: #ffffff; font-size: 22px; font-weight: bold;")
         
         l.addWidget(lbl_title)
         l.addWidget(lbl_val)

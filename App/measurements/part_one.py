@@ -7,23 +7,29 @@ class PartOneMeasurement(StreamingTempMeasurement):
     SAMPLE_RATE_HZ = 1.0
     SHOW_REFERENCE_CURVE = True
 
-    def __init__(self, serial_mgr, pwm_channel=0, pwm_value=0):
-        # Předáme kwargs dál (i když zde je explicitně pwm_channel)
+    # --- ZDE BYLA CHYBA: Musíš přidat 'adc_filter=False' do závorky ---
+    def __init__(self, serial_mgr, pwm_channel=0, pwm_value=0, adc_filter=False):
         super().__init__(serial_mgr)
         
         self._pwm_channel = pwm_channel
         self._pwm_value = pwm_value
-        
-        # Poznámka: self.recorded_data se inicializuje už v StreamingTempMeasurement
+        self._adc_filter = adc_filter
 
     def on_start(self):
         """
         Specifická logika pro start Části 1:
-        Nastavíme PWM a pak pustíme standardní měření.
+        Nastavíme PWM, Filtr a pak pustíme standardní měření.
         """
         if self.serial.is_open():
+            # 1. Nastavení PWM
             print(f"PartOne: Nastavuji PWM CH{self._pwm_channel} -> {self._pwm_value}%")
             self.serial.write_line(f"SET PWM {self._pwm_channel} {self._pwm_value}")
+            time.sleep(0.1)
+            
+            # 2. Nastavení Filtru
+            filter_val = 1 if self._adc_filter else 0
+            print(f"PartOne: Nastavuji Filter -> {filter_val}")
+            self.serial.write_line(f"SET FILTER {filter_val}")
             time.sleep(0.1)
             
         super().on_start()

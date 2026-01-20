@@ -2,11 +2,13 @@
 #include <Arduino.h>
 #include "../../lib/comm/SerialProtocol.h"
 #include "../../lib/actuators/ActuatorController.h"
+#include "../../lib/sensors/AdcSensor.h" // <-- PŘIDAT TENTO IMPORT
 
 class CommandDispatcher {
 public:
-    CommandDispatcher(SerialProtocol& protocol, ActuatorController& actuators)
-        : _proto(protocol), _actuators(actuators) {}
+    // Upravený konstruktor přijímá i AdcSensor
+    CommandDispatcher(SerialProtocol& protocol, ActuatorController& actuators, AdcSensor& adc)
+        : _proto(protocol), _actuators(actuators), _adc(adc) {}
 
     void apply(const Command& cmd);
     void checkSafetyTimeout(); // <-- NOVÁ METODA
@@ -17,6 +19,7 @@ public:
 private:
     SerialProtocol& _proto;
     ActuatorController& _actuators;
+    AdcSensor& _adc;
 
     bool _isRunning = false;
     float _rateHz = 2.0f;
