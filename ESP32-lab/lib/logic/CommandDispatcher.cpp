@@ -15,6 +15,12 @@ void CommandDispatcher::apply(const Command& cmd) {
             _actuators.stopAll();
             _proto.sendAck("stop");
             break;
+
+        case CommandType::SetFilter:
+            // cmd.value obsahuje 1 (zapnout) nebo 0 (vypnout)
+            _adc.setFilter(cmd.value == 1);
+            _proto.sendAck("set_filter");
+            break;
         
         case CommandType::Ping:
             // Jen resetuje časovač (už se stalo výše), neposíláme ACK

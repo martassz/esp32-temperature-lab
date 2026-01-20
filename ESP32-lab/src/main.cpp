@@ -21,7 +21,7 @@ TmpSensor tmp;
 ActuatorController actuators;
 SerialProtocol proto;
 
-CommandDispatcher dispatcher(proto, actuators);
+CommandDispatcher dispatcher(proto, actuators, adc);
 
 static uint32_t g_last_ms = 0;
 

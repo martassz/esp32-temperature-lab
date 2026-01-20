@@ -17,6 +17,9 @@ public:
     float readAdsMilliVolts(uint8_t channel);
     float readEspMilliVolts(uint8_t pin);
 
+    void setFilter(bool enabled);
+
 private:
     Adafruit_ADS1115 ads;
+    bool _filterEnabled = false;
 };

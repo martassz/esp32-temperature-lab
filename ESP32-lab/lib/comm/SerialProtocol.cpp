@@ -29,7 +29,7 @@ void SerialProtocol::processLine(const String& line, Command& cmd) {
     if (up == "START") { cmd.type = CommandType::Start; return; }
     if (up == "STOP")  { cmd.type = CommandType::Stop; return; }
     if (up == "PING")  { cmd.type = CommandType::Ping; return; } // <-- NOVÉ
-
+    
     if (up.startsWith("SET PWM")) {
         int idx = up.indexOf("SET PWM");
         if (idx >= 0) {
@@ -42,6 +42,14 @@ void SerialProtocol::processLine(const String& line, Command& cmd) {
                 cmd.pwmValue = rest.substring(space + 1).toFloat();
             }
         }
+        return;
+    }
+
+    if (up.startsWith("SET FILTER")) {
+        // Očekáváme formát "SET FILTER 1" nebo "SET FILTER 0"
+        // Délka "SET FILTER " je 11 znaků
+        cmd.type = CommandType::SetFilter;
+        cmd.value = line.substring(11).toInt(); // Uložíme 1 nebo 0 do námi vytvořené proměnné value
         return;
     }
 

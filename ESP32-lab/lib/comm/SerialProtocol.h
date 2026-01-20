@@ -3,11 +3,12 @@
 #include "../sensors/DallasSensor.h"
 
 enum class CommandType {
-    None, Start, Stop, SetRate, SetPwm, Ping // <-- NOVÝ PŘÍKAZ
+    None, Start, Stop, SetRate, SetPwm, Ping, SetFilter // <-- PŘIDÁNO SetFilter
 };
 
 struct Command {
     CommandType type = CommandType::None;
+    int value = 0;         // <-- PŘIDÁNO: Obecná hodnota (např. pro Filter 0/1)
     float rateHz = 0.0f;
     int pwmChannel = 0;    
     float pwmValue = 0.0f; 

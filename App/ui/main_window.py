@@ -98,7 +98,6 @@ class MainWindow(QMainWindow):
             self.sidebar.show_simple_controls()
             self.plot_widget.set_dual_axis_mode(False)
         
-        # Metoda set_scrolling_mode odstraněna, graf se nyní vždy roztahuje
 
     @Slot(str)
     def _start_measurement(self, type_name: str):
@@ -106,13 +105,18 @@ class MainWindow(QMainWindow):
         self.plot_widget.clear()
         self.sidebar.progress.setValue(0)
         
+        # --- ZÍSKÁNÍ STAVU FILTRU PŘÍMO Z GUI ---
+        # (Zabrání problémům se synchronizací)
+        filter_state = self.sidebar.is_filter_checked()
+        
         # --- Příprava argumentů pro konkrétní měření ---
         kwargs = {}
         if type_name == PartOneMeasurement.DISPLAY_NAME:
             # Jen PartOneMeasurement umí zpracovat tyto argumenty
             kwargs = {
                 "pwm_channel": self._pending_pwm_channel,
-                "pwm_value": self._pending_pwm_value
+                "pwm_value": self._pending_pwm_value,
+                "adc_filter": filter_state
             }
 
         self.sidebar.set_measurement_running(True)
@@ -142,6 +146,7 @@ class MainWindow(QMainWindow):
         # Jen uložíme hodnotu, odeslání řeší samotná třída měření po startu
         self._pending_pwm_channel = channel
         self._pending_pwm_value = value
+        # ZDE JSME ODSTRANILI ŘÁDEK SE self._pending_filter, KTERÝ ZPŮSOBOVAL CHYBU
 
     @Slot(float, dict)
     def _on_measurement_data(self, t_s: float, values: dict):
@@ -180,7 +185,6 @@ class MainWindow(QMainWindow):
         if msg and msg.get("type") == "hello":
             self.detected_sensors = []
             
-            # --- ZMĚNA: Přidání do seznamu pod správnými klíči ---
             if str(msg.get("bme")).lower() == "true":
                 self.detected_sensors.append("T_BME")
             if str(msg.get("tmp")).lower() == "true":
