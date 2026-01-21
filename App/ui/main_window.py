@@ -1,3 +1,5 @@
+import os
+
 from typing import Optional, Set
 from PySide6.QtCore import Slot, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -142,15 +144,53 @@ class MainWindow(QMainWindow):
     def _stop_measurement(self):
         self.meas_mgr.stop_measurement()
 
+    def _get_best_export_path(self):
+        """Najde nejlepší dostupnou složku pro uložení souboru."""
+        candidates = []
+        
+        # 1. Zkusíme Windows systémovou cestu k profilu
+        if os.name == 'nt':
+            user_profile = os.environ.get('USERPROFILE')
+            if user_profile:
+                candidates.append(os.path.join(user_profile, 'Downloads'))
+                candidates.append(os.path.join(user_profile, 'Desktop'))
+
+        # 2. Zkusíme standardní konstrukci přes domovskou složku
+        home = os.path.expanduser("~")
+        candidates.append(os.path.join(home, 'Downloads'))
+        candidates.append(os.path.join(home, 'Desktop'))
+        candidates.append(os.path.join(home, 'Documents'))
+        candidates.append(home) # Poslední záchrana - domovská složka uživatele
+
+        # Projdeme kandidáty a vrátíme první, který reálně existuje na disku
+        for path in candidates:
+            try:
+                if path and os.path.exists(path):
+                    return path
+            except Exception:
+                continue
+                
+        return "" # Pokud vše selže, vrátí prázdný řetězec (= složka aplikace)
+
     @Slot()
     def _on_export_clicked(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Uložit CSV", "", "CSV (*.csv)")
-        if filename:
-            # Předáváme allowed_sensors pro filtrování
-            if self.meas_mgr.export_data(filename, self.allowed_sensors):
-                QMessageBox.information(self, "OK", "Data exportována.")
-            else:
-                QMessageBox.warning(self, "Chyba", "Nelze exportovat data (žádná data k dispozici?).")
+        default_dir = self._get_best_export_path()
+
+        filename, _ = QFileDialog.getSaveFileName(self, "Uložit CSV", default_dir, "CSV (*.csv)")
+        if not filename:
+            return
+
+        sensors_to_export = self.allowed_sensors
+        
+        current_type = self.sidebar.combo_type.currentText()
+        
+        if not sensors_to_export and current_type != PartOneMeasurement.DISPLAY_NAME:
+            sensors_to_export = {s for s in self.detected_sensors if not s.startswith("V_")}
+
+        if self.meas_mgr.export_data(filename, sensors_to_export):
+            QMessageBox.information(self, "OK", "Data exportována.")
+        else:
+            QMessageBox.warning(self, "Chyba", "Nelze exportovat data (žádná data k dispozici?).")
 
     @Slot(int, int)
     def _on_pwm_changed(self, channel: int, value: int):
@@ -161,10 +201,16 @@ class MainWindow(QMainWindow):
 
     @Slot(float, dict)
     def _on_measurement_data(self, t_s: float, values: dict):
+        current_type = self.sidebar.combo_type.currentText()
+        
+        if current_type != PartOneMeasurement.DISPLAY_NAME:
+            values = {k: v for k, v in values.items() if not k.startswith("V_")}
+
         if self.allowed_sensors:
             filtered = {k: v for k, v in values.items() if k in self.allowed_sensors}
         else:
             filtered = values
+            
         if filtered:
             self.cards_panel.update_values(filtered)
             
@@ -243,9 +289,29 @@ class MainWindow(QMainWindow):
         
     @Slot()
     def _open_sensor_settings(self):
-        dlg = SensorConfigDialog(self.allowed_sensors, self.detected_sensors, self)
+        # 1. Zjistíme, jaké měření je aktuálně vybrané
+        current_type = self.sidebar.combo_type.currentText()
+        
+        # 2. Vytvoříme seznam senzorů k zobrazení
+        # Začneme se všemi detekovanými
+        sensors_to_show = list(self.detected_sensors)
+        
+        # 3. Aplikujeme filtr:
+        # Pokud aktuální měření NENÍ "Část 1" (která jako jediná podporuje napětí/druhou osu),
+        # odstraníme ze seznamu vše, co začíná na "V_" (Voltage/ADC).
+        if current_type != PartOneMeasurement.DISPLAY_NAME:
+            sensors_to_show = [s for s in sensors_to_show if not s.startswith("V_")]
+
+        # 4. Otevřeme dialog s vyfiltrovaným seznamem
+        dlg = SensorConfigDialog(self.allowed_sensors, sensors_to_show, self)
+        
         if dlg.exec():
+            # Uložíme nový výběr
             self.allowed_sensors = dlg.get_allowed_sensors()
+            
+            # Volitelné: Pokud jsme právě odškrtli senzory, které už nejsou v seznamu,
+            # je dobré hned překreslit graf nebo karty, aby nezůstaly viset staré hodnoty.
+            self.cards_panel.clear()
 
     @Slot()
     def _on_unexpected_disconnect(self):
