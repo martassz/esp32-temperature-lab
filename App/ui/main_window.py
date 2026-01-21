@@ -13,10 +13,12 @@ from ui.panels.sidebar import Sidebar
 from ui.panels.cards import ValueCardsPanel
 from ui.realtime_plot import RealtimePlotWidget
 from ui.dialogs.sensor_config import SensorConfigDialog
-from measurements.part_one import PartOneMeasurement 
+from measurements.part_one import PartOneMeasurement
+from measurements.part_two import PartTwoMeasurement 
 
 class MainWindow(QMainWindow):
     handshake_received_signal = Signal()
+    connection_lost_signal = Signal()
 
     def __init__(self):
         super().__init__()
@@ -29,6 +31,8 @@ class MainWindow(QMainWindow):
         self._pending_pwm_value = 0
 
         self.serial_mgr = SerialManager()
+        self.serial_mgr.set_connection_lost_callback(self.connection_lost_signal.emit)
+        self.connection_lost_signal.connect(self._on_unexpected_disconnect)
         self.meas_mgr = MeasurementManager(self.serial_mgr)
         self.allowed_sensors: Set[str] = set()
         
@@ -92,8 +96,15 @@ class MainWindow(QMainWindow):
         self.plot_widget.set_reference_mode(show_ref)
 
         if type_name == PartOneMeasurement.DISPLAY_NAME:
+            # Část 1: PWM + Filtr + Duální osa
             self.sidebar.show_pwm_controls()
             self.plot_widget.set_dual_axis_mode(True)
+
+        elif type_name == PartTwoMeasurement.DISPLAY_NAME:
+            # Část 2: PWM + BEZ filtru + Jednoduchá osa
+            self.sidebar.show_pwm_controls(show_filter=False)
+            self.plot_widget.set_dual_axis_mode(False)
+
         else:
             self.sidebar.show_simple_controls()
             self.plot_widget.set_dual_axis_mode(False)
@@ -235,3 +246,16 @@ class MainWindow(QMainWindow):
         dlg = SensorConfigDialog(self.allowed_sensors, self.detected_sensors, self)
         if dlg.exec():
             self.allowed_sensors = dlg.get_allowed_sensors()
+
+    @Slot()
+    def _on_unexpected_disconnect(self):
+        """Zavolá se, když SerialManager detekuje pád spojení (vytržení kabelu)."""
+        # Pokud už jsme odpojení, nic neděláme (prevence zdvojených hlášek)
+        if not self.sidebar._is_connected: 
+            return
+
+        # Využijeme existující logiku pro odpojení (zastaví měření, vyčistí UI)
+        self._handle_disconnect_request()
+        
+        # Informujeme uživatele
+        QMessageBox.critical(self, "Chyba spojení", "Zařízení bylo neočekávaně odpojeno!")

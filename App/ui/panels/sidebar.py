@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QProgressBar, QWidget, QSlider, QRadioButton, QButtonGroup, QHBoxLayout,
     QCheckBox
 )
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QTimer
 
 from core.serial_manager import SerialManager
 
@@ -35,6 +35,10 @@ class Sidebar(QFrame):
         self.slider_pwm = None 
         
         self._init_ui(measurement_types)
+
+        self.port_scan_timer = QTimer(self)
+        self.port_scan_timer.timeout.connect(self.update_ports)
+        self.port_scan_timer.start(1000)
 
     def _init_ui(self, measurement_types: List[str]):
         layout = QVBoxLayout(self)
@@ -210,7 +214,7 @@ class Sidebar(QFrame):
         
         self.btn_export.hide()
 
-    def show_pwm_controls(self):
+    def show_pwm_controls(self, show_filter: bool = True):
         self.clear_dynamic_section()
         
         self._add_section_label(self.dynamic_layout, "OVLÁDÁNÍ VÝKONU")
@@ -250,7 +254,12 @@ class Sidebar(QFrame):
         
         self.dynamic_layout.addWidget(self.slider_pwm)
         self.btn_export.show()
-        self.filter_cb.show()
+
+        if show_filter:
+            self.filter_cb.show()
+        else:
+            self.filter_cb.hide()
+            self.filter_cb.setChecked(False)
 
     def show_simple_controls(self):
         self.clear_dynamic_section()
@@ -284,12 +293,34 @@ class Sidebar(QFrame):
         """)
         layout.addWidget(lbl)
 
-    # --- Původní metody ---
     def update_ports(self):
-        current = self.combo_ports.currentText()
-        self.combo_ports.clear()
-        self.combo_ports.addItems(SerialManager.list_ports())
-        self.combo_ports.setCurrentText(current)
+        """Aktualizuje seznam COM portů, pokud došlo ke změně."""
+        
+        # Pokud jsme již připojeni, seznam neaktualizujeme (je disabled)
+        if self._is_connected:
+            return
+
+        new_ports = SerialManager.list_ports()
+        
+        # Získáme seznam portů, které jsou aktuálně v ComboBoxu
+        current_items = [self.combo_ports.itemText(i) for i in range(self.combo_ports.count())]
+        
+        # Porovnáme seznamy - aktualizujeme jen při reálné změně hardwaru
+        if new_ports != current_items:
+            current_selection = self.combo_ports.currentText()
+            
+            # Zablokujeme signály, aby se nespouštěly eventy během překreslování
+            self.combo_ports.blockSignals(True)
+            self.combo_ports.clear()
+            self.combo_ports.addItems(new_ports)
+            
+            # Pokusíme se obnovit původní výběr
+            if current_selection in new_ports:
+                self.combo_ports.setCurrentText(current_selection)
+            elif new_ports:
+                self.combo_ports.setCurrentIndex(0)
+            
+            self.combo_ports.blockSignals(False)
 
     def set_connected_state(self, connected: bool):
         # --- ZMĚNA: Ukládáme si stav připojení ---
