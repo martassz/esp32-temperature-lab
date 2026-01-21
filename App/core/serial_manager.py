@@ -12,6 +12,7 @@ class SerialManager:
         self._reader_thread: Optional[threading.Thread] = None
         self._running = False
         self._line_callback: Optional[Callable[[str], None]] = None
+        self._connection_lost_callback: Optional[Callable[[], None]] = None
 
     @staticmethod
     def list_ports() -> List[str]:
@@ -41,6 +42,10 @@ class SerialManager:
         time.sleep(0.2)  # Chvilku počkáme, než ESP nastartuje
 
         self._start_reader()
+
+    def set_connection_lost_callback(self, cb: Optional[Callable[[], None]]):
+        """Nastaví funkci, která se zavolá při neočekávané ztrátě spojení."""
+        self._connection_lost_callback = cb
 
     def close(self):
         self._running = False
@@ -92,4 +97,8 @@ class SerialManager:
             except Exception:
                 # V případě odpojení USB za chodu
                 self._running = False
+                
+                # NOVÉ: Pokud máme nastavený callback, zavoláme ho
+                if self._connection_lost_callback:
+                    self._connection_lost_callback()
                 break
