@@ -22,7 +22,7 @@ public:
     void sendAck(const char* cmd);
     void sendAckSetRate(float rateHz);
     void sendError(const char* msg);
-    void sendData(uint32_t t_ms, float t_bme, DallasBus& dallas, float v1, float v2, float v3, float v4, float t_tmp);
+    void sendData(uint32_t t_ms, float t_tmp, float t_bme, DallasBus& dallas, float v1, float v2, float v3, float v4);
 
 private:
     String _buffer;

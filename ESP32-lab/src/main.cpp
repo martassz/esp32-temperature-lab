@@ -64,17 +64,16 @@ void loop() {
         if (now - g_last_ms >= period) {
             g_last_ms = now;
 
-            float t_bme = bme.readTemperatureC();
             float t_tmp = tmp.readTemperatureC();
+            float t_bme = bme.readTemperatureC();
             float mv_ads_r   = adc.readAdsMilliVolts(AdcSensor::ADS_CH_RESISTOR);
             float mv_ads_ntc = adc.readAdsMilliVolts(AdcSensor::ADS_CH_NTC);
             float mv_esp_r   = adc.readEspMilliVolts(AdcSensor::PIN_ESP_RESISTOR);
             float mv_esp_ntc = adc.readEspMilliVolts(AdcSensor::PIN_ESP_NTC);
 
-            proto.sendData(now, t_bme, dallas, 
+            proto.sendData(now, t_tmp, t_bme, dallas, 
                            mv_ads_r, mv_ads_ntc, 
-                           mv_esp_r, mv_esp_ntc, 
-                           t_tmp);
+                           mv_esp_r, mv_esp_ntc);
         }
     }
     delay(1);

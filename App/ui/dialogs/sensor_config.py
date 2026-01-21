@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt
 from typing import Set, List
 
 # Import nové centrální logiky názvů
-from core.sensors import get_sensor_name
+from core.sensors import get_sensor_name, get_sensor_sort_key
 
 class SensorConfigDialog(QDialog):
     def __init__(self, allowed_sensors: Set[str], available_sensors: List[str], parent=None):
@@ -66,6 +66,8 @@ class SensorConfigDialog(QDialog):
         self.checks_layout.setSpacing(5)
         
         sensor_list = self.available_sensors if self.available_sensors else []
+
+        sensor_list = sorted(sensor_list, key=get_sensor_sort_key)
 
         for key in sensor_list:
             # Použití centrální funkce pro hezký název
