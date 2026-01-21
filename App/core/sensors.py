@@ -1,44 +1,109 @@
-from typing import Dict
+"""
+App/core/sensors.py
+Centrální definice názvů, jednotek a priority řazení senzorů.
+"""
+import re
 
-# Centrální mapa názvů senzorů
-# Klíč: Identifikátor v JSONu z ESP32
-# Hodnota: Hezký název pro GUI (Legenda, Checkboxy, Kartičky)
-SENSOR_NAMES: Dict[str, str] = {
-    "T_BME": "BME280",
-    "T_TMP": "TMP117",
-    
-    # ADC (Externí ADS1115)
-    "V_ADS_R": "U R (ADC)",
-    "V_ADS_NTC": "U NTC (ADC)",
-    
-    # ADC (Interní ESP32)
-    "V_ESP_R": "U R (ESP)",
-    "V_ESP_NTC": "U NTC (ESP)",
-    
-    # Legacy / Fallback názvy (pokud by ESP poslalo starý formát)
-    "ADC_R": "U R (ADC)",
-    "ADC_NTC": "U NTC (ADC)",
-    "ESP_R": "U R (ESP)",
-    "ESP_NTC": "U NTC (ESP)",
-}
+# --- DEFINICE PRIORITNÍHO POŘADÍ ---
+# Čím je senzor v seznamu výše, tím dříve se zobrazí.
+# PWM zde není uvedeno, proto spadne automaticky na konec (priorita 999).
+SENSOR_ORDER = [
+    "T_TMP",       # 1. Referenční teplota (TMP117)
+    "T_BME",       # 2. Teplota vzduchu (BME)
+    "T_DS",        # 3. Dallasy (obecný prefix pro T_DS0, T_DS1...)
+    "V_ADS_NTC",   # 4. Napětí přesná (Externí ADC)
+    "V_ADS_R",
+    "V_ESP_NTC",   # 5. Napětí hrubá (Interní ESP)
+    "V_ESP_R"
+]
 
 def get_sensor_name(key: str) -> str:
     """
-    Vrátí hezký název pro daný klíč senzoru.
-    Řeší i dynamické senzory jako DS18B20.
+    Převede technický klíč na čitelný název pro uživatele.
     """
-    # 1. Zkusíme přímou shodu v mapě
-    if key in SENSOR_NAMES:
-        return SENSOR_NAMES[key]
+    # 1. Pevně definované názvy
+    mapping = {
+        # Teploty
+        "T_TMP": "Referenční teplota (TMP117)",
+        "T_BME": "Teplota (BME280)",
+        
+        # Napětí - Externí ADC
+        "V_ADS_NTC": "U - termistoru (Externí ADC)",
+        "V_ADS_R":   "U - rezistoru (Externí ADC)",
+        
+        # Napětí - Interní ESP32
+        "V_ESP_NTC": "U - termistoru (Interní ESP32 ADC)",
+        "V_ESP_R":   "U - rezistoru (Interní ESP32 ADC)",
+        
+        # PWM (zde definujeme název, i když je v řazení až na konci)
+        "PWM_HEAT": "Výkon topení",
+        "PWM_COOL": "Výkon chlazení"
+    }
     
-    # 2. Dynamické senzory (DS18B20)
+    if key in mapping:
+        return mapping[key]
+
+    # 2. Dynamické názvy
+    
+    # Dallas senzory: T_DS0 -> Teplota (DS18B20 #1)
     if key.startswith("T_DS"):
-        # Očekáváme formát T_DS0, T_DS1...
         try:
-            idx = int(key.replace("T_DS", ""))
-            return f"Senzor DS18B20 #{idx + 1}"
+            # Získáme index (0, 1...) a přičteme 1 pro hezčí číslování
+            index = int(key.replace("T_DS", "")) + 1
+            return f"Teplota (DS18B20 #{index})"
         except ValueError:
-            return key # Fallback
+            return key 
+
+    # PWM kanály obecně
+    if key.startswith("PWM"):
+        return f"PWM {key}"
+
+    # 3. Fallback - odstraníme podtržítka
+    return key.replace("_", " ")
+
+def get_sensor_unit(key: str) -> str:
+    """
+    Vrátí jednotku pro daný typ senzoru.
+    """
+    # Teploty
+    if key.startswith("T_"):
+        return "°C"
+    
+    # Napětí (V_... nebo obsahující ADC/ESP)
+    if key.startswith("V_") or "ADC" in key or "ESP" in key:
+        return "mV"
+        
+    # PWM
+    if "PWM" in key:
+        return "%"
+        
+    return ""
+
+def get_sensor_sort_key(key: str) -> float:
+    """
+    Vrátí číselnou hodnotu pro řazení (nižší číslo = dřívější pozice).
+    Použijte jako key=get_sensor_sort_key v sorted().
+    """
+    # 1. Přesná shoda v prioritním seznamu
+    if key in SENSOR_ORDER:
+        return float(SENSOR_ORDER.index(key))
+    
+    # 2. Prefixy (pro Dallasy a jiné dynamické senzory)
+    for i, prefix in enumerate(SENSOR_ORDER):
+        if key.startswith(prefix):
+            # Pokud je to T_DS0, chceme, aby byl za T_TMP a T_BME,
+            # ale aby T_DS0 < T_DS1.
+            # Proto přičteme malé číslo podle indexu senzoru.
+            extra = 0.0
+            try:
+                # Najdeme všechna čísla v klíči
+                nums = re.findall(r'\d+', key)
+                if nums:
+                    # Vezmeme poslední číslo a vydělíme 100
+                    extra = int(nums[-1]) * 0.01
+            except: pass
             
-    # 3. Pokud neznáme, vrátíme původní klíč
-    return key
+            return float(i) + extra
+
+    # 3. Neznámé senzory a PWM nakonec
+    return 999.0

@@ -3,18 +3,13 @@ from PySide6.QtWidgets import (
     QLabel, QScrollArea
 )
 from PySide6.QtCore import Qt
-
-# Importujeme funkci pro hezké názvy
-try:
-    from core.sensors import get_sensor_name
-except ImportError:
-    from ui.realtime_plot import RealtimePlotWidget
-    get_sensor_name = RealtimePlotWidget.format_sensor_name
+from core.sensors import get_sensor_name, get_sensor_unit, get_sensor_sort_key
 
 class ValueCardsPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(130)
+        # Zvětšíme výšku celého panelu, aby se tam pohodlně vešly vyšší karty
+        self.setFixedHeight(140) 
         self._labels = {} 
         self._init_ui()
 
@@ -25,14 +20,15 @@ class ValueCardsPanel(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff) # Horizontální scroll je automatický
         scroll.setStyleSheet("background-color: #1e1e1e; border: none;")
         
         self.container = QWidget()
         self.container.setStyleSheet("background-color: #1e1e1e;")
         
         self.cards_layout = QHBoxLayout(self.container)
-        self.cards_layout.setContentsMargins(20, 15, 20, 15)
+        # Trochu zvětšíme horní/dolní okraj
+        self.cards_layout.setContentsMargins(20, 10, 20, 10)
         self.cards_layout.setSpacing(15)
         self.cards_layout.addStretch()
         
@@ -40,15 +36,11 @@ class ValueCardsPanel(QWidget):
         main_layout.addWidget(scroll)
 
     def update_values(self, values: dict):
-        for key, val in values.items():
-            unit = "°C"
-            
-            # Identifikace jednotek
-            if key.startswith("V_") or key.startswith("ADC") or key.startswith("ESP"):
-                unit = "mV"
-            elif key.startswith("PWM"):
-                unit = "%"
-            
+        sorted_keys = sorted(values.keys(), key=get_sensor_sort_key)
+        
+        for key in sorted_keys:
+            val = values[key]
+            unit = get_sensor_unit(key)
             text_val = f"{val:.2f} {unit}"
             
             if key in self._labels:
@@ -62,15 +54,19 @@ class ValueCardsPanel(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         self._labels.clear()
+        self._labels = {} # Důležité: vyčistit i slovník labelů!
 
     def _create_card(self, key: str, initial_text: str):
         pretty_name = get_sensor_name(key)
 
         frame = QFrame()
         frame.setObjectName("ValueCard")
+        # Pevná šířka 170px je ideální
         frame.setFixedWidth(170)
+        # Výšku necháme počítat automaticky nebo dáme min-height,
+        # aby karty neposkakovaly při změně délky textu.
+        frame.setMinimumHeight(100) 
         
-        # --- STYL KARTY ---
         frame.setStyleSheet("""
             QFrame#ValueCard {
                 background-color: #333337;
@@ -84,16 +80,20 @@ class ValueCardsPanel(QWidget):
         """)
         
         l = QVBoxLayout(frame)
-        l.setContentsMargins(10, 10, 10, 10)
-        l.setSpacing(2)
+        # Větší odsazení, aby text nebyl nalepený
+        l.setContentsMargins(8, 12, 8, 12)
+        l.setSpacing(5)
         
-        # --- NADPIS (NÁZEV SENZORU) ---
+        # --- NADPIS (S WORD WRAP) ---
         lbl_title = QLabel(pretty_name)
         lbl_title.setObjectName("ValueTitle")
         lbl_title.setAlignment(Qt.AlignCenter)
+        # KLÍČOVÉ: Povolit zalamování řádků
+        lbl_title.setWordWrap(True) 
         
-        # ZMĚNA: Použita barva #007acc (stejná jako v Sidebaru)
-        lbl_title.setStyleSheet("color: #007acc; font-size: 14px; font-weight: bold;")
+        # Zmenšil jsem font na 13px, aby se dlouhé názvy vešly lépe
+        # Line-height (odsazení řádků) řeší Qt automaticky docela dobře
+        lbl_title.setStyleSheet("color: #007acc; font-size: 13px; font-weight: bold;")
         
         # --- HODNOTA ---
         lbl_val = QLabel(initial_text)

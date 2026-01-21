@@ -185,10 +185,12 @@ class MainWindow(QMainWindow):
         if msg and msg.get("type") == "hello":
             self.detected_sensors = []
             
-            if str(msg.get("bme")).lower() == "true":
-                self.detected_sensors.append("T_BME")
             if str(msg.get("tmp")).lower() == "true":
                 self.detected_sensors.append("T_TMP")
+
+            if str(msg.get("bme")).lower() == "true":
+                self.detected_sensors.append("T_BME")
+            
                 
             if str(msg.get("adc")).lower() == "true":
                 # Názvy klíčů musí odpovídat tomu, co posílá ESP v sendData

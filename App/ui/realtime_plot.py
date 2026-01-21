@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 import pyqtgraph as pg
 
 # Čistý import z centrálního souboru
-from core.sensors import get_sensor_name
+from core.sensors import get_sensor_name, get_sensor_sort_key
 
 class RealtimePlotWidget(QWidget):
     def __init__(self, time_window_s: float = 60.0, parent=None):
@@ -105,7 +105,10 @@ class RealtimePlotWidget(QWidget):
     def add_point(self, t_s: float, values: Dict[str, float]):
         current_max_time = t_s
 
-        for sensor_key, val in values.items():
+        sorted_keys = sorted(values.keys(), key=get_sensor_sort_key)
+
+        for sensor_key in sorted_keys:
+            val = values[sensor_key]
             # Pokud křivka pro daný senzor neexistuje, vytvoříme ji
             if sensor_key not in self._curves:
                 self._create_curve(sensor_key)
@@ -158,7 +161,7 @@ class RealtimePlotWidget(QWidget):
         # --- ZJEDNODUŠENÁ LOGIKA ---
         # Zda je tento konkrétní senzor referencí, závisí jen na jeho ID 
         # a na tom, zda je zapnutý globální referenční režim pro tento graf.
-        is_reference = ("TMP117" in key or "TMP117" in pretty_name) and self._reference_mode_enabled
+        is_reference = (key == "T_TMP") and self._reference_mode_enabled
         
         if is_reference:
             color = pg.mkColor("#FFFFFF")
