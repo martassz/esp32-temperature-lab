@@ -37,7 +37,9 @@ def get_sensor_name(key: str) -> str:
         
         # PWM (zde definujeme název, i když je v řazení až na konci)
         "PWM_HEAT": "Výkon topení",
-        "PWM_COOL": "Výkon chlazení"
+        "PWM_COOL": "Výkon chlazení",
+
+        "Target": "Cílová teplota"
     }
     
     if key in mapping:
@@ -67,6 +69,9 @@ def get_sensor_unit(key: str) -> str:
     """
     # Teploty
     if key.startswith("T_"):
+        return "°C"
+    
+    if key == "Target":
         return "°C"
     
     # Napětí (V_... nebo obsahující ADC/ESP)

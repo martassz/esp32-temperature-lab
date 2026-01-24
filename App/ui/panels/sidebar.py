@@ -2,9 +2,10 @@ from typing import List
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QLabel, QComboBox, QPushButton, 
     QProgressBar, QWidget, QSlider, QRadioButton, QButtonGroup, QHBoxLayout,
-    QCheckBox
+    QCheckBox, QDoubleSpinBox
 )
 from PySide6.QtCore import Signal, Qt, QTimer
+from matplotlib import container
 
 from core.serial_manager import SerialManager
 
@@ -19,6 +20,7 @@ class Sidebar(QFrame):
     pwm_changed = Signal(int, int) # (channel, value 0-100)
     export_clicked = Signal()
     filter_toggled = Signal(bool)
+    target_temp_changed = Signal(float)
 
     def __init__(self, measurement_types: List[str], parent=None):
         super().__init__(parent)
@@ -32,7 +34,9 @@ class Sidebar(QFrame):
         # Inicializace referencí na dynamické prvky pro bezpečnost
         self.rb_heater = None
         self.rb_cooler = None
-        self.slider_pwm = None 
+        self.slider_pwm = None
+        self.sb_target = None
+        self.sl_target = None 
         
         self._init_ui(measurement_types)
 
@@ -212,6 +216,9 @@ class Sidebar(QFrame):
         self.rb_cooler = None
         self.slider_pwm = None 
         
+        self.sb_target = None
+        self.sl_target = None
+
         self.btn_export.hide()
 
     def show_pwm_controls(self, show_filter: bool = True):
@@ -260,6 +267,53 @@ class Sidebar(QFrame):
         else:
             self.filter_cb.hide()
             self.filter_cb.setChecked(False)
+
+    def show_regulation_controls(self):
+        self.clear_dynamic_section()
+        self._add_section_label(self.dynamic_layout, "CÍLOVÁ TEPLOTA")
+
+        container = QWidget()
+        l = QVBoxLayout(container)
+        l.setSpacing(10)
+        l.setContentsMargins(0,0,0,0)
+
+        # SpinBox
+        self.sb_target = QDoubleSpinBox()
+        self.sb_target.setRange(18.0, 40.0)
+        self.sb_target.setSuffix(" °C")
+        self.sb_target.setDecimals(1)
+        self.sb_target.setSingleStep(0.5)
+        self.sb_target.setValue(25.0)
+        self.sb_target.setAlignment(Qt.AlignCenter)
+        self.sb_target.setStyleSheet("""
+            QDoubleSpinBox {
+                background-color: #333337; color: #e0e0e0; 
+                border: 1px solid #505050; padding: 5px; font-weight: bold;
+            }
+        """)
+
+        # Slider (hodnoty * 10)
+        self.sl_target = QSlider(Qt.Horizontal)
+        self.sl_target.setRange(180, 400) 
+        self.sl_target.setValue(250)
+
+        # Synchronizace
+        self.sb_target.valueChanged.connect(lambda v: self.sl_target.setValue(int(v*10)))
+        self.sl_target.valueChanged.connect(lambda v: self.sb_target.setValue(v/10))
+
+        # Signál ven
+        self.sb_target.valueChanged.connect(self.target_temp_changed.emit)
+
+        l.addWidget(self.sb_target)
+        l.addWidget(self.sl_target)
+
+        lbl_info = QLabel("Změna teploty povolena pouze při STOP.")
+        lbl_info.setStyleSheet("color: #666; font-size: 10px; font-style: italic;")
+        l.addWidget(lbl_info)
+
+        self.dynamic_layout.addWidget(container)
+        self.filter_cb.hide()
+        self.btn_export.show()
 
     def show_simple_controls(self):
         self.clear_dynamic_section()
@@ -361,6 +415,8 @@ class Sidebar(QFrame):
         self.btn_sensors.setEnabled(not running)
         self.filter_cb.setEnabled(not running)
         self.btn_export.setEnabled(not running)
+        if self.sb_target: self.sb_target.setEnabled(not running)
+        if self.sl_target: self.sl_target.setEnabled(not running)
 
         try:
             if self.rb_heater and not self.rb_heater.isHidden():
