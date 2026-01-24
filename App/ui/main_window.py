@@ -16,7 +16,8 @@ from ui.panels.cards import ValueCardsPanel
 from ui.realtime_plot import RealtimePlotWidget
 from ui.dialogs.sensor_config import SensorConfigDialog
 from measurements.part_one import PartOneMeasurement
-from measurements.part_two import PartTwoMeasurement 
+from measurements.part_two import PartTwoMeasurement
+from measurements.part_three import PartThreeMeasurement 
 
 class MainWindow(QMainWindow):
     handshake_received_signal = Signal()
@@ -107,6 +108,11 @@ class MainWindow(QMainWindow):
             self.sidebar.show_pwm_controls(show_filter=False)
             self.plot_widget.set_dual_axis_mode(False)
 
+        elif type_name == PartThreeMeasurement.DISPLAY_NAME:
+            self.sidebar.show_regulation_controls()
+            self.plot_widget.set_dual_axis_mode(False)
+            self.plot_widget.set_time_window(10.0)
+
         else:
             self.sidebar.show_simple_controls()
             self.plot_widget.set_dual_axis_mode(False)
@@ -134,6 +140,10 @@ class MainWindow(QMainWindow):
 
         self.sidebar.set_measurement_running(True)
         
+        if type_name == PartThreeMeasurement.DISPLAY_NAME:
+            target = self.sidebar.sb_target.value()
+            kwargs = {"target_temp": target}
+
         # Předáme parametry manageru -> ten je předá konstruktoru měření
         self.meas_mgr.start_measurement(type_name, **kwargs)
         
@@ -202,19 +212,43 @@ class MainWindow(QMainWindow):
     @Slot(float, dict)
     def _on_measurement_data(self, t_s: float, values: dict):
         current_type = self.sidebar.combo_type.currentText()
-        
+
+        # 1. Logika regulace (Část 3) - Přidá PWM a Target do 'values'
+        if current_type == PartThreeMeasurement.DISPLAY_NAME:
+             meas = self.meas_mgr._current_measurement
+             if hasattr(meas, "perform_regulation_logic"):
+                 values = meas.perform_regulation_logic(values)
+
+        # 2. Filtrace napětí (pro Část 2 a 3 odstraníme V_ senzory)
         if current_type != PartOneMeasurement.DISPLAY_NAME:
             values = {k: v for k, v in values.items() if not k.startswith("V_")}
 
+        # 3. Uživatelský výběr senzorů (allowed_sensors)
         if self.allowed_sensors:
             filtered = {k: v for k, v in values.items() if k in self.allowed_sensors}
+            
+            # --- OPRAVA CHYBY Č. 2 ---
+            # Pokud jsme v Části 3, musíme ručně vrátit PWM a Target, 
+            # protože ty nejsou v seznamu 'allowed_sensors' (nejsou v dialogu)
+            if current_type == PartThreeMeasurement.DISPLAY_NAME:
+                if "PWM" in values: filtered["PWM"] = values["PWM"]
+                if "Target" in values: filtered["Target"] = values["Target"]
         else:
             filtered = values
             
+        # 4. Aktualizace KARET (Zobrazíme vše)
         if filtered:
             self.cards_panel.update_values(filtered)
             
-        self.plot_widget.add_point(t_s, filtered)
+        # 5. Aktualizace GRAFU (Odstraníme PWM)
+        plot_values = filtered.copy()
+        
+        if current_type == PartThreeMeasurement.DISPLAY_NAME:
+            keys_to_remove = [k for k in plot_values.keys() if "PWM" in k]
+            for k in keys_to_remove:
+                del plot_values[k]
+
+        self.plot_widget.add_point(t_s, plot_values)
 
     @Slot(float)
     def _on_measurement_progress(self, fraction: float):
@@ -325,3 +359,19 @@ class MainWindow(QMainWindow):
         
         # Informujeme uživatele
         QMessageBox.critical(self, "Chyba spojení", "Zařízení bylo neočekávaně odpojeno!")
+
+    @Slot(float)
+    def _on_target_temp_changed(self, val):
+        # OPRAVA: Zjistíme typ měření ze Sidebaru, ne z manageru (tam to neexistuje)
+        current_type = self.sidebar.combo_type.currentText()
+        
+        if current_type == PartThreeMeasurement.DISPLAY_NAME:
+             # Sáhneme si pro instanci přímo do manageru
+             meas = self.meas_mgr._current_measurement
+             if isinstance(meas, PartThreeMeasurement):
+                 meas.set_target_temperature(val)
+             else:
+                 # Pokud měření ještě neběží, uložíme si hodnotu pro start
+                 # (tuto logiku už máme vyřešenou v _start_measurement načtením ze sidebaru,
+                 #  takže zde nemusíme dělat nic)
+                 pass

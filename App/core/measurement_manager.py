@@ -7,6 +7,7 @@ from measurements.streaming_measurement import StreamingTempMeasurement
 from measurements.bme_dallas_slow import BmeDallasSlowMeasurement
 from measurements.part_one import PartOneMeasurement
 from measurements.part_two import PartTwoMeasurement
+from measurements.part_three import PartThreeMeasurement
 
 class MeasurementManager(QObject):
     data_received = Signal(float, dict)
@@ -21,7 +22,8 @@ class MeasurementManager(QObject):
         
         self._types = {
             PartOneMeasurement.DISPLAY_NAME: PartOneMeasurement,
-            PartTwoMeasurement.DISPLAY_NAME: PartTwoMeasurement, # <--- Registrace
+            PartTwoMeasurement.DISPLAY_NAME: PartTwoMeasurement,
+            PartThreeMeasurement.DISPLAY_NAME: PartThreeMeasurement,
             "Krátké měření": StreamingTempMeasurement,
             "Pomalé měření": BmeDallasSlowMeasurement,
         }

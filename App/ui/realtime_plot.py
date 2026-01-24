@@ -186,7 +186,7 @@ class RealtimePlotWidget(QWidget):
             # Běžný styl
             style = Qt.SolidLine
             width = 2
-            symbol = 'x'
+            symbol = None
             sym_size = 7
             
             # (Volitelné) Pokud chcete zachovat čárkování ostatních teplot v dual-axis režimu:
