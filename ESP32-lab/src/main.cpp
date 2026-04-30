@@ -47,6 +47,8 @@ void setup() {
 
 void loop() {
     // 1. Příkazy
+    dallas.update();
+
     Command cmd;
     if (proto.readCommand(cmd)) {
         dispatcher.apply(cmd);
