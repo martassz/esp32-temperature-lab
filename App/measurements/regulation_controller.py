@@ -54,27 +54,31 @@ class PIController:
         # Výpočet chyby
         error = setpoint - measured_value
         
-        # --- 2. VÝBĚR KONSTANT (TOPENÍ vs CHLAZENÍ) ---
-        # Podle toho, jestli jsme pod nebo nad cílem, vybereme sadu parametrů.
+        # --- 2. VÝBĚR KONSTANT PRO P a D SLOŽKU (Okamžitá reakce) ---
         if error > 0:
-            kp, ki, kd = self.kp_heat, self.ki_heat, self.kd_heat
+            kp, kd = self.kp_heat, self.kd_heat
             mode = "HEAT"
         else:
-            kp, ki, kd = self.kp_cool, self.ki_cool, self.kd_cool
+            kp, kd = self.kp_cool, self.kd_cool
             mode = "COOL"
 
-        # --- 3. I-SLOŽKA: CHYTRÝ ALGORITMUS (CLAMPING) ---
-        
-        # A) Načítání integrálu
-        if abs(error) < self.deadband:
-            pass # V toleranci neděláme nic
-        elif abs(error) < self.int_active_threshold:
-            # POZOR ZMĚNA: Násobíme Ki už zde. 
-            # self._integral nyní přímo reprezentuje "akumulovaný výkon v %".
-            self._integral += (error * ki * dt)
+        # --- 3. I-SLOŽKA: TEPELNÁ PAMĚŤ SYSTÉMU ---
+        # ZÁSADNÍ OPRAVA: Rychlost integrace závisí na tom, v jakém režimu 
+        # se komora stabilizovala, nikoliv na aktuálním drobném překmitu.
+        if self._integral >= 0:
+            ki_active = self.ki_heat  # Integrál je v plusu, používáme topné Ki
         else:
-            # Jsme moc daleko, integrál by jen škodil.
+            ki_active = self.ki_cool  # Integrál je v mínusu, používáme chladící Ki
+
+        if abs(error) < self.deadband:
+            pass
+        elif abs(error) < self.int_active_threshold:
+            # Integrál se nyní plní i vyprazdňuje symetrickou rychlostí
+            self._integral += (error * ki_active * dt)
+        else:
             self._integral = 0.0
+
+        ki = ki_active
 
         # B) BEZPEČNOSTNÍ LIMIT (ANTI-WINDUP CLAMPING)
         # Toto je ten "strop", o kterém jsme mluvili.

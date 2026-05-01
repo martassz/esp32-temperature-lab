@@ -159,27 +159,31 @@ class RealtimePlotWidget(QWidget):
         pretty_name = get_sensor_name(key)
         
         # --- ZJEDNODUŠENÁ LOGIKA ---
-        # Zda je tento konkrétní senzor referencí, závisí jen na jeho ID 
-        # a na tom, zda je zapnutý globální referenční režim pro tento graf.
         is_reference = (key == "T_TMP") and self._reference_mode_enabled
+        is_target = (key == "Target") # <--- PŘIDÁNA DETEKCE TARGETU
         
         if is_reference:
-            color = pg.mkColor("#FFFFFF")
+            color = pg.mkColor("#FFFFFF") # Bílá pro referenci
+        elif is_target:
+            color = pg.mkColor("#FFD700") # <--- Zlatá/Žlutá pro požadovanou teplotu
         else:
             color = self._assign_color(len(self._curves))
-        
+            
         self._data_x[key] = []
         self._data_y[key] = []
-
         use_right_axis = self._dual_axis_enabled and (
             key.startswith("V_") or key.startswith("ADC") or key.startswith("ESP")
         )
         
         # --- STYL ---
         if is_reference:
-            # Referenční styl: Bílá, čárkovaná, bez symbolu
-            style = Qt.DashLine
+            style = Qt.DashLine    # Bílá přerušovaná (čárky)
             width = 2
+            symbol = None
+            sym_size = 0
+        elif is_target:
+            style = Qt.DotLine     # <--- Tečkovaná čára pro cíl
+            width = 3              # <--- Trochu tlustší, ať je dobře vidět
             symbol = None
             sym_size = 0
         else:
@@ -189,7 +193,6 @@ class RealtimePlotWidget(QWidget):
             symbol = None
             sym_size = 7
             
-            # (Volitelné) Pokud chcete zachovat čárkování ostatních teplot v dual-axis režimu:
             if self._dual_axis_enabled and not use_right_axis:
                 style = Qt.DashLine
 

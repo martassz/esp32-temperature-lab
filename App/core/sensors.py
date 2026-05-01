@@ -58,7 +58,10 @@ def get_sensor_name(key: str) -> str:
 
     # PWM kanály obecně
     if key.startswith("PWM"):
-        return f"PWM {key}"
+        if key == "PWM":
+            return "Výkon PWM"
+        else:
+            return f"PWM {key.replace('PWM_', '')}"
 
     # 3. Fallback - odstraníme podtržítka
     return key.replace("_", " ")

@@ -323,28 +323,34 @@ class MainWindow(QMainWindow):
         
     @Slot()
     def _open_sensor_settings(self):
-        # 1. Zjistíme, jaké měření je aktuálně vybrané
+        # 1. Zjistíme, jaký je aktuálně vybraný mód
         current_type = self.sidebar.combo_type.currentText()
         
         # 2. Vytvoříme seznam senzorů k zobrazení
         # Začneme se všemi detekovanými
         sensors_to_show = list(self.detected_sensors)
         
-        # 3. Aplikujeme filtr:
-        # Pokud aktuální měření NENÍ "Část 1" (která jako jediná podporuje napětí/druhou osu),
-        # odstraníme ze seznamu vše, co začíná na "V_" (Voltage/ADC).
-        if current_type != PartOneMeasurement.DISPLAY_NAME:
+        # 3. Aplikujeme filtr podle typu měření:
+        if current_type == PartOneMeasurement.DISPLAY_NAME:
+            # ČÁST 1: Ponecháme POUZE referenční senzor (T_TMP) a napětí (V_)
+            sensors_to_show = [s for s in sensors_to_show if s == "T_TMP" or s.startswith("V_")]
+            
+        elif current_type == PartTwoMeasurement.DISPLAY_NAME:
+            # ČÁST 2: Ponecháme POUZE referenční senzor a Dallasy
+            sensors_to_show = [s for s in sensors_to_show if s == "T_TMP" or s.startswith("T_DS")]
+            
+        else:
+            # ČÁST 3 (a případné další): Schováme napětí, necháme všechny teploty
             sensors_to_show = [s for s in sensors_to_show if not s.startswith("V_")]
 
         # 4. Otevřeme dialog s vyfiltrovaným seznamem
         dlg = SensorConfigDialog(self.allowed_sensors, sensors_to_show, self)
         
         if dlg.exec():
-            # Uložíme nový výběr
+            # Uložíme nově vybrané
             self.allowed_sensors = dlg.get_allowed_sensors()
             
-            # Volitelné: Pokud jsme právě odškrtli senzory, které už nejsou v seznamu,
-            # je dobré hned překreslit graf nebo karty, aby nezůstaly viset staré hodnoty.
+            # Překreslení karet, aby nezůstaly viset staré hodnoty
             self.cards_panel.clear()
 
     @Slot()

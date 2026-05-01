@@ -4,7 +4,8 @@ from .regulation_controller import PIController
 class PartThreeMeasurement(StreamingTempMeasurement):
     DISPLAY_NAME = "Část 3: Regulace teploty"
     DURATION_S = 3600.0
-    SAMPLE_RATE_HZ = 1.0  # Důležité: Rodičovská třída toto použije pro SET RATE
+    SAMPLE_RATE_HZ = 1.0
+    SHOW_REFERENCE_CURVE = True
 
     def __init__(self, serial_mgr, target_temp=25.0):
         # Předáme manager rodiči
@@ -12,17 +13,17 @@ class PartThreeMeasurement(StreamingTempMeasurement):
         
         # Inicializace regulátoru
         self.controller = PIController(
-            kp_heat=38.0,    # Brždění
-            ki_heat=0.25,   # Integrace pro přesné dotažení
-            kd_heat=3000.0,
+            kp_heat=19.27, #
+            ki_heat=0.075, #
+            kd_heat=500.0, #468.2
             
-            kp_cool=200.0,   # Chlazení může být agresivnější
-            ki_cool=0.15,
-            kd_cool=1900.0,
+            kp_cool=260, #
+            ki_cool=4.5, #
+            kd_cool=450.0, #
             
             out_min=-100, 
             out_max=100,
-            int_active_threshold=1.1, # Integrál se zapne až 0.5°C od cíle
+            int_active_threshold=3.75, # Integrál se zapne až 0.5°C od cíle
             deadband=0.0              # Tolerance 0.0°C (neřešíme šum)
         )
         self.target_temp = float(target_temp)
@@ -71,9 +72,9 @@ class PartThreeMeasurement(StreamingTempMeasurement):
             pwm_cool = 0
             
             if action > 0:
-                pwm_heat = int(action)
+                pwm_heat = round(action, 1)
             else:
-                pwm_cool = int(abs(action))
+                pwm_cool = round(abs(action), 1)
 
             # Odeslání do ESP (jen změny)
             if self.serial.is_open():
