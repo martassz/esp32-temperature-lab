@@ -17,12 +17,12 @@ struct Command {
 class SerialProtocol {
 public:
     void begin(unsigned long baud);
-    void sendHello(bool bme_ok, uint8_t dallas_count, bool adc_ok, bool tmp_ok);
+    void sendHello(bool bme_ok, uint8_t dallas_count, bool adc_ok, bool tmp_ok, bool pt1000_ok);
     bool readCommand(Command& cmd);
     void sendAck(const char* cmd);
     void sendAckSetRate(float rateHz);
     void sendError(const char* msg);
-    void sendData(uint32_t t_ms, float t_tmp, float t_bme, DallasBus& dallas, float v1, float v2, float v3, float v4);
+    void sendData(uint32_t t_ms, float t_tmp, float t_bme, float h_bme, DallasBus& dallas, float v1, float v2, float v3, float v4, float v_pt1000, float t_pt1000);
 
 private:
     String _buffer;

@@ -31,6 +31,12 @@ float BmeSensor::readTemperatureC() {
     if (!initialized) {
         return NAN;
     }
-    // BME280 vrací přímo teplotu v °C
     return bme.readTemperature();
+}
+
+float BmeSensor::readHumidity() {
+    if (!initialized) {
+        return NAN;
+    }
+    return bme.readHumidity();
 }

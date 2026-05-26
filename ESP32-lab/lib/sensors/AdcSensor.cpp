@@ -23,43 +23,39 @@ float AdcSensor::readAdsMilliVolts(uint8_t channel) {
 
 float AdcSensor::readEspMilliVolts(uint8_t pin) {
     if (_filterEnabled) {
-        // --- AGRESIVNÍ FILTRACE (HEAVY TRIMMED MEAN) ---
-        // Zvýšíme počet vzorků na 101 pro lepší statistiku
-        const int SAMPLES = 101; 
+        // Můžeš bezpečně zvýšit, paměťově je to na ESP32 v pohodě (200 intů = 800 bytů na stacku)
+        const int SAMPLES = 200; 
         int values[SAMPLES];
         
         for(int i = 0; i < SAMPLES; i++) {
             values[i] = analogReadMilliVolts(pin);
-            // Zkrátíme pauzu na 300 us.
-            // Celkem to potrvá cca 30-35 ms, což je stále rychlé,
-            // ale dost dlouhé na to, aby se vyrušil brum sítě (50Hz) i PWM šum.
             delayMicroseconds(300); 
-        }
-
-        // Seřadíme pole (Bubble Sort)
-        for(int i = 0; i < SAMPLES - 1; i++) {
-            for(int j = 0; j < SAMPLES - i - 1; j++) {
-                if (values[j] > values[j + 1]) {
-                    int temp = values[j];
-                    values[j] = values[j + 1];
-                    values[j + 1] = temp;
-                }
+            
+            // Každých 50 vzorků předáme na chvíli řízení RTOSu (systému), 
+            // aby mohl obsloužit watchdog a nespadlo to.
+            if (i % 50 == 0) {
+                yield(); 
             }
         }
 
+        // --- RYCHLÉ TŘÍDĚNÍ ---
+        // std::sort používá introsort s časovou složitostí O(N log N).
+        // Bude to hotové zlomek milisekundy i pro stovky vzorků.
+        std::sort(values, values + SAMPLES);
+
         // --- EXTRÉMNÍ OŘEZ ---
-        // Zahodíme 25 nejmenších a 25 největších hodnot (tj. cca 25 % z každé strany).
-        // Zbyde nám 51 nejstabilnějších hodnot uprostřed.
         long sum = 0;
-        int count = 0;
-        const int TRIM_COUNT = 25; 
+        
+        // Dynamicky spočítáme 25 % z celkového počtu, aby ořez fungoval 
+        // správně bez ohledu na to, jaké SAMPLES zrovna nastavíš.
+        const int TRIM_COUNT = SAMPLES / 4; 
         
         for(int i = TRIM_COUNT; i < (SAMPLES - TRIM_COUNT); i++) {
             sum += values[i];
-            count++;
         }
-
-        return (float)sum / (float)count;
+        
+        int validCount = SAMPLES - (2 * TRIM_COUNT);
+        return (float)sum / (float)validCount;
 
     } else {
         // --- BEZ FILTRACE ---

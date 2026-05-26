@@ -11,7 +11,8 @@ public:
     // Volitelně možnost natvrdo zadat adresu
     bool begin(uint8_t i2cAddress);
 
-    float readTemperatureC();   // vrací NAN, pokud není inicializováno
+    float readTemperatureC();
+    float readHumidity();
     bool isOk() const { return initialized; }
     uint8_t getAddress() const { return usedAddress; }
 

@@ -15,9 +15,11 @@ from ui.panels.sidebar import Sidebar
 from ui.panels.cards import ValueCardsPanel
 from ui.realtime_plot import RealtimePlotWidget
 from ui.dialogs.sensor_config import SensorConfigDialog
+from ui.dialogs.measurement_config import MeasurementConfigDialog
 from measurements.part_one import PartOneMeasurement
 from measurements.part_two import PartTwoMeasurement
-from measurements.part_three import PartThreeMeasurement 
+from measurements.part_three import PartThreeMeasurement
+from measurements.part_three_test import PartThreeTestMeasurement 
 
 class MainWindow(QMainWindow):
     handshake_received_signal = Signal()
@@ -25,7 +27,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Temp-Lab Dashboard")
+        self.setWindowTitle("Porovnávání způsobů měření teploty prostředí")
         self.resize(1200, 750)
         self.setStyleSheet(STYLESHEET)
 
@@ -40,6 +42,8 @@ class MainWindow(QMainWindow):
         self.allowed_sensors: Set[str] = set()
         
         self.detected_sensors: list[str] = []
+
+        self.measurement_params = {}
 
         self.meas_mgr.data_received.connect(self._on_measurement_data)
         self.meas_mgr.progress_updated.connect(self._on_measurement_progress)
@@ -75,6 +79,7 @@ class MainWindow(QMainWindow):
         self.sidebar.measurement_type_changed.connect(self._on_measurement_type_changed)
         self.sidebar.pwm_changed.connect(self._on_pwm_changed)
         self.sidebar.export_clicked.connect(self._on_export_clicked)
+        self.sidebar.measurement_settings_clicked.connect(self._open_measurement_settings)
 
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -94,6 +99,8 @@ class MainWindow(QMainWindow):
         # Vyčistit graf při změně typu
         self.plot_widget.clear()
         self.cards_panel.clear()
+
+        self._set_default_allowed_sensors(type_name)
 
         show_ref = self.meas_mgr.should_show_reference(type_name)
         self.plot_widget.set_reference_mode(show_ref)
@@ -116,6 +123,21 @@ class MainWindow(QMainWindow):
         else:
             self.sidebar.show_simple_controls()
             self.plot_widget.set_dual_axis_mode(False)
+
+        # Najdi stávající podmínku pro PartThreeMeasurement a rozšiř ji takto:
+        if type_name in [PartThreeMeasurement.DISPLAY_NAME, PartThreeTestMeasurement.DISPLAY_NAME]:
+            self.sidebar.show_regulation_controls()
+            self.plot_widget.set_dual_axis_mode(False)
+            self.plot_widget.set_time_window(10.0)
+            
+            # Skryjeme tlačítko POUZE pro automatickou část 3, pro testovací ho necháme viditelné!
+            if type_name == PartThreeMeasurement.DISPLAY_NAME:
+                self.sidebar.btn_export.hide()
+            else:
+                self.sidebar.btn_export.show()
+        else:
+            if hasattr(self.sidebar, 'btn_export'):
+                self.sidebar.btn_export.show()
         
 
     @Slot(str)
@@ -124,31 +146,43 @@ class MainWindow(QMainWindow):
         self.plot_widget.clear()
         self.sidebar.progress.setValue(0)
         
-        # --- ZÍSKÁNÍ STAVU FILTRU PŘÍMO Z GUI ---
-        # (Zabrání problémům se synchronizací)
         filter_state = self.sidebar.is_filter_checked()
         
-        # --- Příprava argumentů pro konkrétní měření ---
         kwargs = {}
-        if type_name == PartOneMeasurement.DISPLAY_NAME:
-            # Jen PartOneMeasurement umí zpracovat tyto argumenty
+        if type_name in [PartOneMeasurement.DISPLAY_NAME, PartTwoMeasurement.DISPLAY_NAME]:
             kwargs = {
                 "pwm_channel": self._pending_pwm_channel,
                 "pwm_value": self._pending_pwm_value,
                 "adc_filter": filter_state
             }
-
-        self.sidebar.set_measurement_running(True)
-        
-        if type_name == PartThreeMeasurement.DISPLAY_NAME:
+        elif type_name == PartThreeMeasurement.DISPLAY_NAME:
             target = self.sidebar.sb_target.value()
-            kwargs = {"target_temp": target}
+            kwargs = {
+                "target_temp": target,
+                "on_steady_state": self._handle_auto_steady_state_end
+            }
 
-        # Předáme parametry manageru -> ten je předá konstruktoru měření
-        self.meas_mgr.start_measurement(type_name, **kwargs)
+        elif type_name == PartThreeTestMeasurement.DISPLAY_NAME:
+            target = self.sidebar.sb_target.value()
+            kwargs = {
+                "target_temp": target
+            }
+
+        params = self.measurement_params.get(type_name)
+        duration_s = params["duration"] if params else None
+        sample_rate_hz = params["rate"] if params else None
+
+        # Předáme manageru
+        self.meas_mgr.start_measurement(type_name, duration_s=duration_s, sample_rate_hz=sample_rate_hz, **kwargs)
         
-        duration = self.meas_mgr.get_duration()
-        self.plot_widget.set_time_window(60.0 if duration > 300 else duration)
+        if self.meas_mgr.is_running():
+            self.sidebar.set_measurement_running(True)
+            
+        # Zobrazení osy grafu
+        dur = duration_s if duration_s else self.meas_mgr.get_duration()
+        self.plot_widget.set_time_window(60.0 if dur > 300 else dur)
+
+        
 
     @Slot()
     def _stop_measurement(self):
@@ -214,7 +248,7 @@ class MainWindow(QMainWindow):
         current_type = self.sidebar.combo_type.currentText()
 
         # 1. Logika regulace (Část 3) - Přidá PWM a Target do 'values'
-        if current_type == PartThreeMeasurement.DISPLAY_NAME:
+        if current_type in [PartThreeMeasurement.DISPLAY_NAME, PartThreeTestMeasurement.DISPLAY_NAME]:
              meas = self.meas_mgr._current_measurement
              if hasattr(meas, "perform_regulation_logic"):
                  values = meas.perform_regulation_logic(values)
@@ -228,9 +262,9 @@ class MainWindow(QMainWindow):
             filtered = {k: v for k, v in values.items() if k in self.allowed_sensors}
             
             # --- OPRAVA CHYBY Č. 2 ---
-            # Pokud jsme v Části 3, musíme ručně vrátit PWM a Target, 
+            # Pokud jsme v Části 3 nebo Měření překmitu, musíme ručně vrátit PWM a Target, 
             # protože ty nejsou v seznamu 'allowed_sensors' (nejsou v dialogu)
-            if current_type == PartThreeMeasurement.DISPLAY_NAME:
+            if current_type in [PartThreeMeasurement.DISPLAY_NAME, PartThreeTestMeasurement.DISPLAY_NAME]:
                 if "PWM" in values: filtered["PWM"] = values["PWM"]
                 if "Target" in values: filtered["Target"] = values["Target"]
         else:
@@ -240,11 +274,11 @@ class MainWindow(QMainWindow):
         if filtered:
             self.cards_panel.update_values(filtered)
             
-        # 5. Aktualizace GRAFU (Odstraníme PWM)
+        # 5. Aktualizace GRAFU (Odstraníme PWM a vlhkost)
         plot_values = filtered.copy()
         
-        if current_type == PartThreeMeasurement.DISPLAY_NAME:
-            keys_to_remove = [k for k in plot_values.keys() if "PWM" in k]
+        if current_type in [PartThreeMeasurement.DISPLAY_NAME, PartThreeTestMeasurement.DISPLAY_NAME]:
+            keys_to_remove = [k for k in plot_values.keys() if "PWM" in k or k == "H_BME"]
             for k in keys_to_remove:
                 del plot_values[k]
 
@@ -257,8 +291,15 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_measurement_finished(self):
+        # Obrana proti "zbloudilým" signálům ze starého měření
+        if self.meas_mgr.is_running():
+            return
+            
         self.sidebar.set_measurement_running(False)
-        QMessageBox.information(self, "Hotovo", "Měření dokončeno.")
+        
+        # Schováme běžné okno pro Část 3, protože ta má svoje vlastní specifické
+        if self.sidebar.combo_type.currentText() != PartThreeMeasurement.DISPLAY_NAME:
+            QMessageBox.information(self, "Hotovo", "Měření dokončeno.")
     
     @Slot(str)
     def _handle_connect_request(self, port: str):
@@ -280,11 +321,10 @@ class MainWindow(QMainWindow):
                 self.detected_sensors.append("T_TMP")
 
             if str(msg.get("bme")).lower() == "true":
-                self.detected_sensors.append("T_BME")
+                self.detected_sensors.extend(["T_BME", "H_BME"])
             
                 
             if str(msg.get("adc")).lower() == "true":
-                # Názvy klíčů musí odpovídat tomu, co posílá ESP v sendData
                 self.detected_sensors.extend(["V_ADS_R", "V_ADS_NTC", "V_ESP_R", "V_ESP_NTC"])
                 
             try:
@@ -292,6 +332,9 @@ class MainWindow(QMainWindow):
                 for i in range(dallas_count):
                     self.detected_sensors.append(f"T_DS{i}")
             except: pass
+
+            if str(msg.get("pt1000")).lower() == "true":
+                self.detected_sensors.extend(["V_PT1000", "T_PT1000"])
             
             print(f"Detekováno: {self.detected_sensors}")
             self.handshake_received_signal.emit()
@@ -300,6 +343,10 @@ class MainWindow(QMainWindow):
     def _on_handshake_ok(self):
         self.handshake_timer.stop()
         self.sidebar.set_connected_state(True)
+
+        current_type = self.sidebar.combo_type.currentText()
+        self._set_default_allowed_sensors(current_type)
+
         QMessageBox.information(self, "Připojeno", "Spojení navázáno.")
 
     @Slot()
@@ -322,6 +369,24 @@ class MainWindow(QMainWindow):
         self.plot_widget.clear()
         
     @Slot()
+    def _set_default_allowed_sensors(self, current_type: str):
+        """Automaticky nastaví povolené senzory podle aktuálně vybrané části."""
+        if not self.detected_sensors:
+            self.allowed_sensors = set()
+            return
+
+        sensors_to_show = list(self.detected_sensors)
+        
+        if current_type == PartOneMeasurement.DISPLAY_NAME:
+            sensors_to_show = [s for s in sensors_to_show if s == "T_TMP" or s.startswith("V_")]
+        elif current_type == PartTwoMeasurement.DISPLAY_NAME:
+            sensors_to_show = [s for s in sensors_to_show if s == "T_TMP" or s.startswith("T_DS")]
+        else:
+            sensors_to_show = [s for s in sensors_to_show if not s.startswith("V_")]
+
+        # Rovnou uložíme do aktivního filtru aplikace
+        self.allowed_sensors = set(sensors_to_show)
+
     def _open_sensor_settings(self):
         # 1. Zjistíme, jaký je aktuálně vybraný mód
         current_type = self.sidebar.combo_type.currentText()
@@ -354,6 +419,29 @@ class MainWindow(QMainWindow):
             self.cards_panel.clear()
 
     @Slot()
+    def _open_measurement_settings(self):
+        current_type = self.sidebar.combo_type.currentText()
+
+        # Zjistíme defaultní hodnoty pro danou část přímo z její třídy, pokud je ještě nemáme v paměti
+        if current_type not in self.measurement_params:
+            cls = self.meas_mgr._types.get(current_type)
+            def_dur = int(getattr(cls, 'DURATION_S', 600))
+            def_rate = float(getattr(cls, 'SAMPLE_RATE_HZ', 1.0))
+            self.measurement_params[current_type] = {"duration": def_dur, "rate": def_rate}
+
+        params = self.measurement_params[current_type]
+
+        # Otevřeme dialog s aktuálními hodnotami
+        dlg = MeasurementConfigDialog(params["duration"], params["rate"], self)
+        if dlg.exec():
+            # Pokud uživatel klikl na Uložit, přepíšeme paměť
+            new_dur, new_rate = dlg.get_values()
+            self.measurement_params[current_type] = {"duration": new_dur, "rate": new_rate}
+            
+            # Upravíme i osu grafu podle nového času
+            self.plot_widget.set_time_window(60.0 if new_dur > 300 else new_dur)
+
+    @Slot()
     def _on_unexpected_disconnect(self):
         """Zavolá se, když SerialManager detekuje pád spojení (vytržení kabelu)."""
         # Pokud už jsme odpojení, nic neděláme (prevence zdvojených hlášek)
@@ -381,3 +469,25 @@ class MainWindow(QMainWindow):
                  # (tuto logiku už máme vyřešenou v _start_measurement načtením ze sidebaru,
                  #  takže zde nemusíme dělat nic)
                  pass
+
+    def _handle_auto_steady_state_end(self):
+            """Zavolá se automaticky, jakmile regulace zaznamená 10 vteřin stabilního stavu."""
+            # 1. Zastavíme měření (tím se pošle STOP do ESP32 a vypne se PWM)
+            self._stop_measurement()
+            
+            # 2. Informujeme studenty
+            QMessageBox.information(
+                self, 
+                "Měření dokončeno", 
+                "Bylo změřeno 10 vzorků.\n"
+                "Nyní vyberte, kam chcete CSV uložit."
+            )
+            
+            # 3. Vyvoláme stávající exportní funkci, kterou už v kódu máme!
+            self._on_export_clicked()
+
+    def closeEvent(self, event):
+        if self.serial_mgr.is_open():
+             self._handle_disconnect_request()
+             
+        event.accept()

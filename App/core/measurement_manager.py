@@ -3,11 +3,10 @@ from PySide6.QtCore import QObject, Signal
 
 from core.serial_manager import SerialManager
 from measurements.base import BaseMeasurement
-from measurements.streaming_measurement import StreamingTempMeasurement
-from measurements.bme_dallas_slow import BmeDallasSlowMeasurement
 from measurements.part_one import PartOneMeasurement
 from measurements.part_two import PartTwoMeasurement
 from measurements.part_three import PartThreeMeasurement
+from measurements.part_three_test import PartThreeTestMeasurement
 
 class MeasurementManager(QObject):
     data_received = Signal(float, dict)
@@ -24,18 +23,13 @@ class MeasurementManager(QObject):
             PartOneMeasurement.DISPLAY_NAME: PartOneMeasurement,
             PartTwoMeasurement.DISPLAY_NAME: PartTwoMeasurement,
             PartThreeMeasurement.DISPLAY_NAME: PartThreeMeasurement,
-            "Krátké měření": StreamingTempMeasurement,
-            "Pomalé měření": BmeDallasSlowMeasurement,
+            PartThreeTestMeasurement.DISPLAY_NAME: PartThreeTestMeasurement,
         }
 
     def get_available_types(self):
         return list(self._types.keys())
 
-    def start_measurement(self, type_name: str, **kwargs):
-        """
-        Spustí vybrané měření. 
-        Argumenty v **kwargs jsou předány konstruktoru třídy měření.
-        """
+    def start_measurement(self, type_name: str, duration_s: float = None, sample_rate_hz: float = None, **kwargs):
         cls = self._types.get(type_name)
         if not cls:
             self.error_occurred.emit(f"Neznámý typ měření: {type_name}")
@@ -43,12 +37,13 @@ class MeasurementManager(QObject):
 
         self.stop_measurement()
 
-        # Zde předáme kwargs (např. pwm_channel, pwm_value) do konstruktoru
-        # Pokud měření tyto argumenty nečeká, je nutné zajistit, aby kwargs byly prázdné,
-        # nebo aby třída akceptovala **kwargs.
-        # V našem případě to řídí MainWindow.
         try:
             self._current_measurement = cls(self._serial_mgr, **kwargs)
+            
+            if duration_s is not None:
+                self._current_measurement.DURATION_S = float(duration_s)
+            if sample_rate_hz is not None:
+                self._current_measurement.SAMPLE_RATE_HZ = float(sample_rate_hz)
             
             self._current_measurement.set_callbacks(
                 on_data=self._on_data_callback,
@@ -84,6 +79,19 @@ class MeasurementManager(QObject):
         return 60.0
 
     def _on_data_callback(self, t_s: float, values: dict):
+        # --- BEZPEČNOSTNÍ POJISTKA ---
+        for key, value in values.items():
+            # Kontrolujeme pouze klíče teplotních senzorů a číselné hodnoty
+            if key.startswith("T_") and isinstance(value, (int, float)):
+                if value >= 42.0:
+                    self.stop_measurement()
+                    self.error_occurred.emit(
+                        f"BEZPEČNOSTNÍ ZASTAVENÍ: Teplota na senzoru {key} dosáhla {value:.1f} °C "
+                        "(limit je 42.0 °C)!"
+                    )
+                    return  # Ukončíme metodu, data už do UI (grafu/karet) nepošleme
+
+        # --- Běžné odeslání dat do UI, pokud je vše pod limitem ---
         self.data_received.emit(t_s, values)
 
     def should_show_reference(self, type_name: str) -> bool:

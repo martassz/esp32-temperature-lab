@@ -16,7 +16,8 @@ class Sidebar(QFrame):
     start_measurement_clicked = Signal(str)
     stop_measurement_clicked = Signal()
     sensor_settings_clicked = Signal()
-    measurement_type_changed = Signal(str) 
+    measurement_type_changed = Signal(str)
+    measurement_settings_clicked = Signal()
     pwm_changed = Signal(int, int) # (channel, value 0-100)
     export_clicked = Signal()
     filter_toggled = Signal(bool)
@@ -126,6 +127,21 @@ class Sidebar(QFrame):
         """)
         self.btn_sensors.clicked.connect(self.sensor_settings_clicked.emit)
         layout.addWidget(self.btn_sensors)
+
+        self.btn_meas_settings = QPushButton(" ⚙ Parametry měření")
+        self.btn_meas_settings.setCursor(Qt.PointingHandCursor)
+        self.btn_meas_settings.setStyleSheet("""
+            QPushButton {
+                background-color: #3e3e42;
+                border: 1px solid #505050;
+                color: #e0e0e0;
+                text-align: left;
+                padding-left: 15px;
+            }
+            QPushButton:hover { background-color: #505050; border: 1px solid #007acc;}
+        """)
+        self.btn_meas_settings.clicked.connect(self.measurement_settings_clicked.emit)
+        layout.addWidget(self.btn_meas_settings)
 
         layout.addSpacing(5)
         
@@ -287,8 +303,24 @@ class Sidebar(QFrame):
         self.sb_target.setAlignment(Qt.AlignCenter)
         self.sb_target.setStyleSheet("""
             QDoubleSpinBox {
-                background-color: #333337; color: #e0e0e0; 
-                border: 1px solid #505050; padding: 5px; font-weight: bold;
+                background-color: #333337; 
+                color: #e0e0e0; 
+                border: 1px solid #505050; 
+                padding: 5px; 
+                font-weight: bold;
+                border-radius: 3px;
+                padding-right: 22px; /* Místo pro šipky */
+            }
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+                width: 20px;
+                background-color: #3e3e42;
+                border-left: 1px solid #505050;
+            }
+            QDoubleSpinBox::up-button { 
+                border-bottom: 1px solid #505050; 
+            }
+            QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+                background-color: #505050;
             }
         """)
 
@@ -413,6 +445,7 @@ class Sidebar(QFrame):
         self.btn_stop.setEnabled(running)
         self.combo_type.setEnabled(not running)
         self.btn_sensors.setEnabled(not running)
+        self.btn_meas_settings.setEnabled(not running)
         self.filter_cb.setEnabled(not running)
         self.btn_export.setEnabled(not running)
         if self.sb_target: self.sb_target.setEnabled(not running)

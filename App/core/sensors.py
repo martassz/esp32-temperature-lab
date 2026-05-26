@@ -10,11 +10,13 @@ import re
 SENSOR_ORDER = [
     "T_TMP",       # 1. Referenční teplota (TMP117)
     "T_BME",       # 2. Teplota vzduchu (BME)
+    "T_PT1000",
     "T_DS",        # 3. Dallasy (obecný prefix pro T_DS0, T_DS1...)
     "V_ADS_NTC",   # 4. Napětí přesná (Externí ADC)
     "V_ADS_R",
     "V_ESP_NTC",   # 5. Napětí hrubá (Interní ESP)
-    "V_ESP_R"
+    "V_ESP_R",
+    "V_PT1000"
 ]
 
 def get_sensor_name(key: str) -> str:
@@ -26,6 +28,8 @@ def get_sensor_name(key: str) -> str:
         # Teploty
         "T_TMP": "Referenční teplota (TMP117)",
         "T_BME": "Teplota (BME280)",
+        "H_BME": "Vlhkost (BME280)",
+        "T_PT1000": "Teplota (PT1000)",
         
         # Napětí - Externí ADC
         "V_ADS_NTC": "U - termistoru (Externí ADC)",
@@ -34,6 +38,8 @@ def get_sensor_name(key: str) -> str:
         # Napětí - Interní ESP32
         "V_ESP_NTC": "U - termistoru (Interní ESP32 ADC)",
         "V_ESP_R":   "U - rezistoru (Interní ESP32 ADC)",
+
+        "V_PT1000":  "U - platina (PT1000)",
         
         # PWM (zde definujeme název, i když je v řazení až na konci)
         "PWM_HEAT": "Výkon topení",
@@ -74,6 +80,9 @@ def get_sensor_unit(key: str) -> str:
     if key.startswith("T_"):
         return "°C"
     
+    if key == "H_BME":
+        return "%"
+
     if key == "Target":
         return "°C"
     
