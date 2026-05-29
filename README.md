@@ -1,8 +1,10 @@
 # Laboratory Exercise Focused on Ambient Temperature Measurement Methods
 
+![Measurement Station Setup](Images/measurement_station.jpg)
+
 This repository contains the complete solution for a university laboratory exercise focused on comparing ambient temperature measurement methods. It includes hardware firmware, a pre-compiled desktop application, and raw source codes.
 
-Developed as a Bachelor's thesis at the Brno University of Technology (BUT), the platform allows students to evaluate static accuracy, dynamic response of various sensor architectures (digital, analog, RTD) under controlled conditions.
+Developed as a Bachelor's thesis at the Brno University of Technology (BUT), the platform allows students to evaluate static accuracy and dynamic response of various sensor architectures (digital, analog, RTD) under controlled conditions.
 
 ## Repository Structure
 
@@ -16,6 +18,11 @@ Developed as a Bachelor's thesis at the Brno University of Technology (BUT), the
 ## Hardware Specifications & Pinout
 
 The measurement station is built around the **ESP32 DevKit v1**, with control electronics physically separated from the thermal chamber to minimize thermal interference.
+
+<p align="center">
+  <img src="Images/control_unit.jpg" width="48%" alt="Control Unit Electronics">
+  <img src="Images/measurement_unit.jpg" width="48%" alt="Measurement Chamber Internals">
+</p>
 
 ### Sensor & Actuator Configuration
 
@@ -44,6 +51,8 @@ Before running the desktop application, the ESP32 microcontroller must be progra
 
 ### 2. Software Execution
 For immediate use during laboratory exercises, simply navigate to the `Application/` folder and run the pre-compiled executable file. No Python installation or environment setup is required.
+
+![Desktop Application GUI](Images/application.png)
 
 ### 3. Development & Dependencies (Source Codes)
 To run or modify the raw Python application located in `Source codes/Python app/`, you need Python 3.11+ and the following dependencies:
