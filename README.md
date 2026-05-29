@@ -1,71 +1,61 @@
-# Laboratory Exercise Platform for Ambient Temperature Measurement
+# Laboratory Exercise Focused on Ambient Temperature Measurement Methods
 
-This project is a comprehensive solution for a Bachelor's thesis and laboratory exercise focused on measuring ambient temperature using various methods. It consists of a hardware station based on the ESP32 microcontroller and a desktop application for data visualization and analysis.
+This repository contains the complete solution for a university laboratory exercise focused on comparing ambient temperature measurement methods. It includes hardware firmware, a pre-compiled desktop application, and raw source codes.
 
-The platform allows students to compare accuracy, resolution, and time response of different sensor types (Digital, Analog, Passive components) under controlled conditions.
-
-## Project Goals
-
-This repository implements the practical part of the laboratory exercise design:
-1.  **Sensor Comparison:** Verification of accuracy and dynamic response of sensors (BME280, TMP117, DS18B20, Thermistors).
-2.  **Data Acquisition:** Using ESP32 for reliable data logging via JSON over Serial.
-3.  **Temperature Control:** Platform for controlled ambient temperature change (Heating/Cooling).
-4.  **Visualization:** Desktop GUI for real-time plotting and data export.
+Developed as a Bachelor's thesis at the Brno University of Technology (BUT), the platform allows students to evaluate static accuracy, dynamic response of various sensor architectures (digital, analog, RTD) under controlled conditions.
 
 ## Repository Structure
 
-* `App/` - Python desktop application (GUI) for control and visualization.
-* `ESP32-lab/` - C++ Firmware for the ESP32 microcontroller (PlatformIO project).
+* `Application/` - Ready-to-use compiled desktop application (`.exe`) including its internal assets and a specific readme.
+* `Source codes/`
+  * `ESP32-code/` - C++ firmware for the ESP32 microcontroller (PlatformIO project).
+  * `Python app/` - Raw Python source codes for the desktop GUI.
 
 ---
 
-## Hardware Specification
+## Hardware Specifications & Pinout
 
-**Microcontroller:** ESP32 DevKit v1
+The measurement station is built around the **ESP32 DevKit v1**, with control electronics physically separated from the thermal chamber to minimize thermal interference.
 
-### Supported Sensors
-The firmware supports the following sensors connected simultaneously:
-* **BME280** (I2C): Combined temperature, humidity, and pressure sensor.
-* **TMP117** (I2C): High-precision reference temperature sensor.
-* **DS18B20** (OneWire): Digital temperature sensor (supports multiple sensors on one bus).
-* **ADS1115** (I2C): External 16-bit ADC for precise analog measurements (NTC/Resistor).
-* **Internal ADC**: Used for basic voltage measurements on ESP32 pins.
+### Sensor & Actuator Configuration
 
-### Actuators (Temperature Control)
-* **Heater:** Resistive load controlled via PWM.
-* **Cooler:** Peltier module or Fan controlled via PWM.
-
-### Pinout Configuration
-
-| Component         | Interface      | ESP32 Pin | Notes |
-|-------------------|----------------|-----------|-------|
-| **BME280** | I2C SDA        | GPIO 21   | |
-| **TMP117** | I2C SCL        | GPIO 22   | |
-| **ADS1115** | I2C            | 21 / 22   | Address 0x49 (configurable) |
-| **DS18B20** | OneWire        | GPIO 4    | Requires 4k7 pull-up resistor |
-| **Heater (MOSFET)**| PWM Channel 0 | GPIO 18   | |
-| **Cooler (MOSFET)**| PWM Channel 1 | GPIO 19   | |
-| **Internal ADC** | Analog Input   | GPIO 34   | Resistor divider measurement |
-| **Internal ADC** | Analog Input   | GPIO 35   | NTC Thermistor divider measurement |
+| Component | Type / Interface | ESP32 GPIO | Notes |
+| :--- | :--- | :--- | :--- |
+| **TMP117** | Reference / I2C | 21 (SDA), 22 (SCL) | High-precision reference temperature sensor |
+| **BME280** | Digital / I2C | 21 (SDA), 22 (SCL) | Combined temperature and humidity sensor |
+| **ADS1115** | External 16-bit ADC | 21 (SDA), 22 (SCL) | I2C Address `0x49` (Measures NTC / Resistor) |
+| **DS18B20** | Digital / OneWire | 4 | Supports multiple sensors on one bus, 4k7 pull-up |
+| **MAX31865** | RTD Amplifier / SPI | 5 (CS), 23 (MOSI), 25 (MISO), 26 (CLK) | 3-wire connection for PT1000 |
+| **Internal ADC** | Analog Input | 34 (Resistor), 35 (NTC) | 12-bit ESP32 ADC measurements |
+| **Heater** | Actuator / PWM (Ch 0) | 18 | Power resistor switched via MOSFET |
+| **Cooler** | Actuator / PWM (Ch 1) | 19 | Peltier module switched via MOSFET |
 
 ---
 
-## Software Application
+## Getting Started
 
-The desktop application provides a user-friendly interface for the laboratory exercise.
+To fully utilize the platform, you must configure both the hardware and the software components:
 
-### Features
-* **Connection Manager:** Auto-detection of COM ports and handshake with ESP32.
-* **Real-time Plotting:** High-performance graphing using `pyqtgraph`.
-* **Sensor Selection:** Ability to toggle specific sensors for visualization.
-* **Actuator Control:** Manual PWM slider for Heater and Cooler control.
-* **Data Export:** Export measured data to CSV format for further processing (Excel/MATLAB).
-* **Measurement Modes:** Supports different measurement scenarios (e.g., "Part 1: Resistive Sensors", "Slow Measurement").
+### 1. Hardware Setup (Firmware Flashing)
+Before running the desktop application, the ESP32 microcontroller must be programmed. Running the application alone is not sufficient.
+* Navigate to the `Source codes/ESP32-code/` directory.
+* Open the project in PlatformIO.
+* Build and upload the firmware to your ESP32 board.
 
-### Dependencies
-The application is built with Python 3.11+ and requires the following libraries:
-* `PySide6` (Qt for Python)
+### 2. Software Execution
+For immediate use during laboratory exercises, simply navigate to the `Application/` folder and run the pre-compiled executable file. No Python installation or environment setup is required.
+
+### 3. Development & Dependencies (Source Codes)
+To run or modify the raw Python application located in `Source codes/Python app/`, you need Python 3.11+ and the following dependencies:
+* `PySide6`
 * `pyqtgraph`
 * `pyserial`
 
+Install the dependencies via pip:
+```bash
+pip install PySide6 pyqtgraph pyserial
+```
+
 ---
+#### AI Disclosure
+During the development and documentation process, an AI language model (Google Gemini) was utilized as an assistant for code commenting, formatting, and structural refinement. All AI-generated outputs were thoroughly reviewed, modified, and validated by the author to ensure technical accuracy and strict alignment with the thesis requirements.
